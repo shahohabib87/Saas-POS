@@ -1,0 +1,67 @@
+name: easycasher
+description: "EasyCasher - POS system supporting Kurdish, Arabic and English"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # UI
+  cupertino_icons: ^1.0.8
+  flutter_screenutil: ^5.9.3
+  google_fonts: ^6.2.1
+
+  # State management
+  flutter_riverpod: ^2.6.1
+
+  # Navigation
+  go_router: ^14.6.2
+
+  # Networking
+  dio: ^5.7.0
+
+  # Local database (offline)
+  drift: ^2.21.0
+  sqlite3_flutter_libs: ^0.5.24
+  path_provider: ^2.1.5
+  path: ^1.9.0
+
+  # Real-time (KDS / orders)
+  web_socket_channel: ^3.0.1
+
+  # Local storage (settings, language)
+  shared_preferences: ^2.3.3
+
+  # Localization
+  intl: ^0.20.2
+
+  # Charts (reports)
+  fl_chart: ^0.69.0
+
+  # Printing (receipts)
+  printing: ^5.13.2
+  pdf: ^3.11.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.4.13
+  drift_dev: ^2.21.0
+
+flutter:
+  uses-material-design: true
+
+  generate: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+
