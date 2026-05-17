@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 enum OrderType { dineIn, takeaway, delivery }
 
-enum AppView { pos, kds }
+enum AppView { pos, orders, kds }
 
 final orderTypeProvider =
     StateProvider<OrderType>((ref) => OrderType.dineIn);

@@ -83,22 +83,29 @@ class CashierSidebar extends ConsumerWidget {
               selected: orderType,
             ),
           ],
-          // KDS section — visible to kitchen/manager
-          if (canViewKds) ...[
-            const SizedBox(height: 20),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 18),
-              child: Text(
-                'SCREENS',
-                style: TextStyle(
-                  color: Colors.white38,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                ),
+          // Screens section
+          const SizedBox(height: 20),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 18),
+            child: Text(
+              'SCREENS',
+              style: TextStyle(
+                color: Colors.white38,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
               ),
             ),
-            const SizedBox(height: 6),
+          ),
+          const SizedBox(height: 6),
+          _ViewNavItem(
+            icon: Icons.receipt_long_rounded,
+            label: 'Orders',
+            badge: 0,
+            view: AppView.orders,
+            selected: appView,
+          ),
+          if (canViewKds) ...[
             _ViewNavItem(
               icon: Icons.kitchen_rounded,
               label: 'Kitchen Display',
@@ -106,15 +113,15 @@ class CashierSidebar extends ConsumerWidget {
               view: AppView.kds,
               selected: appView,
             ),
-            if (staff?.role == StaffRole.manager)
-              _ViewNavItem(
-                icon: Icons.point_of_sale_rounded,
-                label: 'POS',
-                badge: 0,
-                view: AppView.pos,
-                selected: appView,
-              ),
           ],
+          if (staff?.role == StaffRole.manager || appView != AppView.pos)
+            _ViewNavItem(
+              icon: Icons.point_of_sale_rounded,
+              label: 'POS',
+              badge: 0,
+              view: AppView.pos,
+              selected: appView,
+            ),
           const Spacer(),
           const Padding(
             padding: EdgeInsets.fromLTRB(14, 0, 14, 20),
