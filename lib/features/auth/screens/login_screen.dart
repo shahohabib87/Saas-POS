@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easycasher/core/constants/app_colors.dart';
 import 'package:easycasher/features/auth/models/staff.dart';
 import 'package:easycasher/features/auth/providers/auth_provider.dart';
+import 'package:easycasher/features/settings/providers/settings_provider.dart';
 import 'package:easycasher/features/auth/widgets/pin_pad.dart';
 import 'package:easycasher/features/auth/widgets/staff_card.dart';
 
@@ -30,6 +31,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final hasError = authState.error == LoginError.wrongPin;
+    final staffList = ref.watch(staffListProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -91,7 +93,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       spacing: 12,
                       runSpacing: 12,
                       alignment: WrapAlignment.center,
-                      children: kDemoStaff
+                      children: staffList
                           .map((s) => SizedBox(
                                 width: 120,
                                 child: StaffCard(

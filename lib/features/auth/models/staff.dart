@@ -36,6 +36,20 @@ class Staff {
     required this.pin,
     required this.avatar,
   });
+
+  Staff copyWith({
+    String? name,
+    StaffRole? role,
+    String? pin,
+    String? avatar,
+  }) =>
+      Staff(
+        id: id,
+        name: name ?? this.name,
+        role: role ?? this.role,
+        pin: pin ?? this.pin,
+        avatar: avatar ?? this.avatar,
+      );
 }
 
 // Demo staff — replace with DB in production

@@ -9,6 +9,7 @@ class KitchenNotifier extends StateNotifier<List<KitchenOrder>> {
     required String tableId,
     required String tableLabel,
     required List<CartItem> cartItems,
+    required KotOrderType orderType,
   }) {
     final kotNumber =
         state.where((o) => o.tableId == tableId).length + 1;
@@ -29,6 +30,7 @@ class KitchenNotifier extends StateNotifier<List<KitchenOrder>> {
       tableLabel: tableLabel,
       items: items,
       status: KotStatus.pending,
+      orderType: orderType,
       createdAt: DateTime.now(),
     );
 

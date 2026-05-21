@@ -1,5 +1,22 @@
 enum KotStatus { pending, inProgress, ready }
 
+enum KotOrderType { dineIn, takeout, delivery, deliveryApp }
+
+extension KotOrderTypeX on KotOrderType {
+  String get label => switch (this) {
+    KotOrderType.dineIn      => 'Dine-In',
+    KotOrderType.takeout     => 'Takeout',
+    KotOrderType.delivery    => 'Delivery',
+    KotOrderType.deliveryApp => 'Delivery App',
+  };
+  int get priority => switch (this) {
+    KotOrderType.dineIn      => 1,
+    KotOrderType.deliveryApp => 2,
+    KotOrderType.delivery    => 3,
+    KotOrderType.takeout     => 4,
+  };
+}
+
 class KotItem {
   final String name;
   final int quantity;
@@ -23,6 +40,7 @@ class KitchenOrder {
   final String tableLabel;
   final List<KotItem> items;
   final KotStatus status;
+  final KotOrderType orderType;
   final DateTime createdAt;
 
   const KitchenOrder({
@@ -32,6 +50,7 @@ class KitchenOrder {
     required this.tableLabel,
     required this.items,
     required this.status,
+    required this.orderType,
     required this.createdAt,
   });
 
@@ -42,6 +61,7 @@ class KitchenOrder {
         tableLabel: tableLabel,
         items: items ?? this.items,
         status: status ?? this.status,
+        orderType: orderType,
         createdAt: createdAt,
       );
 

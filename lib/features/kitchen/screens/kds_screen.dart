@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:easycasher/features/auth/providers/auth_provider.dart';
 import 'package:easycasher/features/kitchen/models/kitchen_order.dart';
 import 'package:easycasher/features/kitchen/providers/kitchen_provider.dart';
 import 'package:easycasher/features/kitchen/widgets/kot_card.dart';
@@ -11,9 +12,12 @@ class KdsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final orders = ref.watch(kitchenProvider);
 
-    final pending    = orders.where((o) => o.status == KotStatus.pending).toList();
-    final inProgress = orders.where((o) => o.status == KotStatus.inProgress).toList();
-    final ready      = orders.where((o) => o.status == KotStatus.ready).toList();
+    int byPriority(KitchenOrder a, KitchenOrder b) =>
+        a.orderType.priority.compareTo(b.orderType.priority);
+
+    final pending    = orders.where((o) => o.status == KotStatus.pending).toList()..sort(byPriority);
+    final inProgress = orders.where((o) => o.status == KotStatus.inProgress).toList()..sort(byPriority);
+    final ready      = orders.where((o) => o.status == KotStatus.ready).toList()..sort(byPriority);
 
     return Container(
       color: const Color(0xFF0D1117),
@@ -164,7 +168,7 @@ class _ColumnDivider extends StatelessWidget {
       Container(width: 1, color: Colors.white.withValues(alpha: 0.06));
 }
 
-class _KdsHeader extends StatelessWidget {
+class _KdsHeader extends ConsumerWidget {
   final int pending;
   final int inProgress;
   final int ready;
@@ -176,7 +180,7 @@ class _KdsHeader extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -197,15 +201,38 @@ class _KdsHeader extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          _HeaderChip(label: 'Active',     count: pending,    color: const Color(0xFF10B981)),
+          _HeaderChip(label: 'Active',    count: pending,    color: const Color(0xFF10B981)),
           const SizedBox(width: 8),
-          _HeaderChip(label: 'Preparing',  count: inProgress, color: const Color(0xFF4529E7)),
+          _HeaderChip(label: 'Preparing', count: inProgress, color: const Color(0xFF4529E7)),
           const SizedBox(width: 8),
-          _HeaderChip(label: 'Ready',      count: ready,      color: Colors.white38),
+          _HeaderChip(label: 'Ready',     count: ready,      color: Colors.white38),
+          const SizedBox(width: 16),
+          const _VerticalDivider(),
+          const SizedBox(width: 16),
+          TextButton.icon(
+            onPressed: () => ref.read(authProvider.notifier).logout(),
+            icon: const Icon(Icons.logout_rounded, size: 16),
+            label: const Text('Logout'),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white60,
+              backgroundColor: Colors.white.withValues(alpha: 0.06),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
         ],
       ),
     );
   }
+}
+
+class _VerticalDivider extends StatelessWidget {
+  const _VerticalDivider();
+
+  @override
+  Widget build(BuildContext context) =>
+      Container(width: 1, height: 28, color: Colors.white12);
 }
 
 class _HeaderChip extends StatelessWidget {

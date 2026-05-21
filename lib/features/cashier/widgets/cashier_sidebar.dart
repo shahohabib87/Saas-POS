@@ -5,7 +5,6 @@ import 'package:easycasher/features/auth/models/staff.dart';
 import 'package:easycasher/features/auth/providers/auth_provider.dart';
 import 'package:easycasher/features/cashier/providers/cashier_provider.dart';
 import 'package:easycasher/features/kitchen/providers/kitchen_provider.dart';
-import 'package:easycasher/features/tables/models/restaurant_table.dart';
 import 'package:easycasher/features/tables/providers/tables_provider.dart';
 
 class CashierSidebar extends ConsumerWidget {
@@ -122,6 +121,14 @@ class CashierSidebar extends ConsumerWidget {
               view: AppView.pos,
               selected: appView,
             ),
+          if (staff?.role == StaffRole.manager)
+            _ViewNavItem(
+              icon: Icons.settings_rounded,
+              label: 'Settings',
+              badge: 0,
+              view: AppView.settings,
+              selected: appView,
+            ),
           const Spacer(),
           const Padding(
             padding: EdgeInsets.fromLTRB(14, 0, 14, 20),
@@ -205,14 +212,7 @@ class _NavItem extends ConsumerWidget {
             ref.read(savedTableNotesProvider.notifier).update(
                   (s) => {...s, activeTable.id: currentNote},
                 );
-            final hasKots = ref
-                .read(kitchenProvider)
-                .any((o) => o.tableId == activeTable.id);
-            if (currentCart.isEmpty && !hasKots) {
-              ref
-                  .read(tablesProvider.notifier)
-                  .setStatus(activeTable.id, TableStatus.available);
-            }
+            // Table stays occupied until payment — never reset automatically
             ref.read(cartProvider.notifier).clear();
             ref.read(orderNoteProvider.notifier).state = '';
             ref.read(tableNumberProvider.notifier).state = '';

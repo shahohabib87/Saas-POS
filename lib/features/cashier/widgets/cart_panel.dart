@@ -8,6 +8,7 @@ import 'package:easycasher/features/kitchen/models/kitchen_order.dart';
 import 'package:easycasher/features/kitchen/providers/kitchen_provider.dart';
 import 'package:easycasher/features/tables/models/restaurant_table.dart';
 import 'package:easycasher/features/tables/providers/tables_provider.dart';
+import 'package:easycasher/features/payment/screens/payment_screen.dart';
 
 class CartPanel extends ConsumerWidget {
   const CartPanel({super.key});
@@ -186,15 +187,7 @@ class _CartHeader extends ConsumerWidget {
           (s) => {...s, activeTable.id: currentNote},
         );
 
-    // Only free the table if cart is empty AND no KOTs have been sent
-    final hasKots = ref
-        .read(kitchenProvider)
-        .any((o) => o.tableId == activeTable.id);
-    if (currentCart.isEmpty && !hasKots) {
-      ref
-          .read(tablesProvider.notifier)
-          .setStatus(activeTable.id, TableStatus.available);
-    }
+    // Table stays occupied until payment is confirmed — never reset on back press
 
     ref.read(cartProvider.notifier).clear();
     ref.read(orderNoteProvider.notifier).state = '';
@@ -405,13 +398,6 @@ class _TotalsSection extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Column(
         children: [
-          _TotalRow(label: 'Subtotal', value: subtotal),
-          const SizedBox(height: 4),
-          _TotalRow(label: 'Tax (5%)', value: tax),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Divider(color: AppColors.outlineVariant),
-          ),
           _TotalRow(label: 'Total', value: total, isTotal: true),
         ],
       ),
@@ -537,6 +523,12 @@ class _ActionButtons extends ConsumerWidget {
     );
   }
 
+  KotOrderType _toKotOrderType(OrderType t) => switch (t) {
+    OrderType.dineIn   => KotOrderType.dineIn,
+    OrderType.takeaway => KotOrderType.takeout,
+    OrderType.delivery => KotOrderType.delivery,
+  };
+
   void _sendToKitchen(BuildContext context, WidgetRef ref) {
     final activeTable = ref.read(activeTableProvider);
     final cartItems = ref.read(cartProvider);
@@ -546,6 +538,7 @@ class _ActionButtons extends ConsumerWidget {
           tableId: activeTable.id,
           tableLabel: 'Table ${activeTable.number}',
           cartItems: cartItems,
+          orderType: _toKotOrderType(ref.read(orderTypeProvider)),
         );
 
     final kotCount = ref
@@ -570,52 +563,25 @@ class _ActionButtons extends ConsumerWidget {
   }
 
   void _confirmPay(BuildContext context, WidgetRef ref) {
+    final activeTable = ref.read(activeTableProvider);
+    final kots = activeTable != null
+        ? ref.read(tableKotsProvider(activeTable.id))
+        : <KitchenOrder>[];
+    final cartItems = ref.read(cartProvider);
+
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Confirm Payment'),
-        content: Text('Collect IQD ${total.toStringAsFixed(0)}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final activeTable = ref.read(activeTableProvider);
-
-              ref.read(cartProvider.notifier).clear();
-              ref.read(orderNoteProvider.notifier).state = '';
-              ref.read(tableNumberProvider.notifier).state = '';
-
-              if (activeTable != null) {
-                ref.read(savedTableOrdersProvider.notifier).update(
-                      (s) => {
-                        for (final e in s.entries)
-                          if (e.key != activeTable.id) e.key: e.value,
-                      },
-                    );
-                ref.read(kitchenProvider.notifier).clearTable(activeTable.id);
-                ref
-                    .read(tablesProvider.notifier)
-                    .setStatus(activeTable.id, TableStatus.available);
-                ref.read(activeTableProvider.notifier).state = null;
-              }
-
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Payment confirmed!'),
-                  backgroundColor: AppColors.success,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary),
-            child: const Text('Confirm',
-                style: TextStyle(color: Colors.white)),
-          ),
-        ],
+      barrierDismissible: false,
+      builder: (_) => PaymentScreen(
+        table: activeTable ??
+            RestaurantTable(
+              id: 'takeout',
+              number: 0,
+              capacity: 0,
+              status: TableStatus.occupied,
+            ),
+        kots: kots,
+        cartItems: cartItems,
       ),
     );
   }

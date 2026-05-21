@@ -2,6 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:easycasher/core/constants/app_colors.dart';
 import 'package:easycasher/features/kitchen/models/kitchen_order.dart';
 
+extension _OrderTypeVisuals on KotOrderType {
+  Color get badgeColor => switch (this) {
+    KotOrderType.dineIn      => const Color(0xFFEF4444),
+    KotOrderType.deliveryApp => const Color(0xFFF97316),
+    KotOrderType.delivery    => const Color(0xFFEAB308),
+    KotOrderType.takeout     => const Color(0xFF10B981),
+  };
+  IconData get icon => switch (this) {
+    KotOrderType.dineIn      => Icons.table_restaurant_rounded,
+    KotOrderType.deliveryApp => Icons.phone_android_rounded,
+    KotOrderType.delivery    => Icons.delivery_dining_rounded,
+    KotOrderType.takeout     => Icons.shopping_bag_outlined,
+  };
+}
+
 class KotCard extends StatefulWidget {
   final KitchenOrder order;
   final VoidCallback onBump;
@@ -101,13 +116,19 @@ class _Header extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  'KOT #${order.kotNumber}',
-                  style: TextStyle(
-                    color: borderColor,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'KOT #${order.kotNumber}',
+                      style: TextStyle(
+                        color: borderColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _OrderTypeBadge(type: order.orderType),
+                  ],
                 ),
               ],
             ),
@@ -152,6 +173,40 @@ class _Header extends StatelessWidget {
         KotStatus.inProgress => 'IN PROGRESS',
         KotStatus.ready      => 'READY',
       };
+}
+
+class _OrderTypeBadge extends StatelessWidget {
+  final KotOrderType type;
+  const _OrderTypeBadge({required this.type});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = type.badgeColor;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(type.icon, size: 10, color: color),
+          const SizedBox(width: 4),
+          Text(
+            type.label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: color,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ItemsList extends StatelessWidget {
