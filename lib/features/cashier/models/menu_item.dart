@@ -18,4 +18,21 @@ class MenuItem {
   });
 
   bool get hasModifiers => modifierGroups.isNotEmpty;
+
+  MenuItem copyWith({
+    String? id,
+    String? categoryId,
+    String? name,
+    double? price,
+    String? emoji,
+    List<ModifierGroup>? modifierGroups,
+  }) =>
+      MenuItem(
+        id: id ?? this.id,
+        categoryId: categoryId ?? this.categoryId,
+        name: name ?? this.name,
+        price: price ?? this.price,
+        emoji: emoji ?? this.emoji,
+        modifierGroups: modifierGroups ?? this.modifierGroups,
+      );
 }

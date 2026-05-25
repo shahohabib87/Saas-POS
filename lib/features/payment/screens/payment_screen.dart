@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easycasher/core/constants/app_colors.dart';
 import 'package:easycasher/core/constants/app_constants.dart';
 import 'package:easycasher/features/cashier/models/cart_item.dart';
+import 'package:easycasher/features/auth/providers/auth_provider.dart';
 import 'package:easycasher/features/cashier/providers/cashier_provider.dart';
 import 'package:easycasher/features/kitchen/models/kitchen_order.dart';
 import 'package:easycasher/features/kitchen/providers/kitchen_provider.dart';
@@ -33,16 +34,30 @@ class PaymentScreen extends ConsumerStatefulWidget {
 class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   PaymentMethod _method = PaymentMethod.cash;
   final _cashController = TextEditingController();
+  final _tipController = TextEditingController();
   bool _showReceipt = false;
   CompletedPayment? _completedPayment;
+  double _tip = 0;
+  int _splitCount = 1;
 
   double get _kotSubtotal =>
       widget.kots.fold(0.0, (s, o) => s + o.total);
   double get _cartSubtotal =>
       widget.cartItems.fold(0.0, (s, i) => s + i.subtotal);
   double get _subtotal => _kotSubtotal + _cartSubtotal;
-  double get _tax => _subtotal * AppConstants.taxRate;
-  double get _total => _subtotal + _tax;
+
+  double get _discountAmount {
+    final type = ref.read(discountTypeProvider);
+    final value = ref.read(discountValueProvider);
+    return type == DiscountType.percent
+        ? _subtotal * (value / 100)
+        : value.clamp(0.0, _subtotal);
+  }
+
+  double get _discountedSubtotal => _subtotal - _discountAmount;
+  double get _tax => _discountedSubtotal * AppConstants.taxRate;
+  double get _totalBeforeTip => _discountedSubtotal + _tax;
+  double get _total => _totalBeforeTip + _tip;
 
   double get _cashReceived =>
       double.tryParse(_cashController.text) ?? 0;
@@ -78,14 +93,54 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   @override
   void dispose() {
     _cashController.dispose();
+    _tipController.dispose();
     super.dispose();
   }
 
   void _complete() {
+    // Build a flat snapshot of all items (KOT items + unsent cart items)
+    final completedItems = <CompletedItem>[
+      for (final kot in widget.kots)
+        for (final i in kot.items)
+          CompletedItem(
+            name: i.name,
+            emoji: '🍽️',
+            quantity: i.quantity,
+            unitPrice: i.unitPrice,
+            modifiersLabel: i.modifierSummary,
+          ),
+      for (final ci in widget.cartItems)
+        CompletedItem(
+          name: ci.item.name,
+          emoji: ci.item.emoji,
+          quantity: ci.quantity,
+          unitPrice: ci.unitPrice,
+          modifiersLabel: ci.modifierSummary,
+        ),
+    ];
+
+    final staff       = ref.read(currentStaffProvider);
+    final orderNumber = ref.read(orderNumberProvider);
+    final orderType   = ref.read(orderTypeProvider);
+    final orderTypeLabel = switch (orderType) {
+      OrderType.dineIn      => 'Dine-In',
+      OrderType.takeaway    => 'Takeout',
+      OrderType.delivery    => 'Delivery',
+      OrderType.deliveryApp => 'Delivery App',
+    };
+
     final payment = CompletedPayment(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
+      orderNumber: orderNumber,
+      orderType: orderTypeLabel,
+      staffName: staff?.name ?? '—',
       tableId: widget.table.id,
       tableNumber: widget.table.number,
+      items: completedItems,
+      subtotal: _subtotal,
+      discountAmount: _discountAmount,
+      tax: _tax,
+      tip: _tip,
       total: _total,
       method: _method,
       cashPaid: _method == PaymentMethod.cash ? _cashReceived : 0,
@@ -106,6 +161,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     ref.read(cartProvider.notifier).clear();
     ref.read(orderNoteProvider.notifier).state = '';
     ref.read(tableNumberProvider.notifier).state = '';
+    ref.read(discountValueProvider.notifier).state = 0;
     ref.read(activeTableProvider.notifier).state = null;
 
     setState(() {
@@ -141,6 +197,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 kots: widget.kots,
                 cartItems: widget.cartItems,
                 subtotal: _subtotal,
+                discountAmount: _discountAmount,
                 tax: _tax,
                 total: _total,
               ),
@@ -149,9 +206,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             Expanded(
               child: _PaymentPanel(
                 total: _total,
+                totalBeforeTip: _totalBeforeTip,
+                tip: _tip,
                 change: _change,
                 method: _method,
                 cashController: _cashController,
+                tipController: _tipController,
                 quickAmounts: _quickAmounts(),
                 canComplete: _canComplete,
                 onMethodChange: (m) => setState(() {
@@ -161,6 +221,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 onQuickAmount: (v) => setState(() {
                   _cashController.text = v.toStringAsFixed(0);
                 }),
+                onTipChange: (v) => setState(() => _tip = v),
+                splitCount: _splitCount,
+                onSplitChange: (v) => setState(() => _splitCount = v),
                 onComplete: _complete,
                 onClose: () => Navigator.pop(context),
               ),
@@ -425,6 +488,10 @@ class _ReceiptPaper extends StatelessWidget {
           // Payment details
           _ReceiptRow('Payment',
               payment.method == PaymentMethod.cash ? 'Cash' : 'Card'),
+          if (payment.tip > 0) ...[
+            const SizedBox(height: 3),
+            _ReceiptRow('Tip', 'IQD ${_fmt(payment.tip)}'),
+          ],
           if (payment.method == PaymentMethod.cash) ...[
             const SizedBox(height: 3),
             _ReceiptRow('Received', 'IQD ${_fmt(payment.cashPaid)}'),
@@ -537,6 +604,7 @@ class _OrderSummary extends StatelessWidget {
   final List<KitchenOrder> kots;
   final List<CartItem> cartItems;
   final double subtotal;
+  final double discountAmount;
   final double tax;
   final double total;
 
@@ -545,6 +613,7 @@ class _OrderSummary extends StatelessWidget {
     required this.kots,
     required this.cartItems,
     required this.subtotal,
+    required this.discountAmount,
     required this.tax,
     required this.total,
   });
@@ -606,7 +675,15 @@ class _OrderSummary extends StatelessWidget {
             padding: const EdgeInsets.all(14),
             child: Column(
               children: [
+                if (discountAmount > 0) ...[
+                  _TotRow('Subtotal', subtotal),
+                  const SizedBox(height: 4),
+                  _TotRow('Discount', discountAmount, isDiscount: true),
+                  const SizedBox(height: 4),
+                ],
                 _TotRow('TOTAL', total, isTotal: true),
+                // tip is included in total — shown separately for clarity
+
               ],
             ),
           ),
@@ -694,27 +771,32 @@ class _TotRow extends StatelessWidget {
   final String label;
   final double value;
   final bool isTotal;
-  const _TotRow(this.label, this.value, {this.isTotal = false});
+  final bool isDiscount;
+  const _TotRow(this.label, this.value, {this.isTotal = false, this.isDiscount = false});
 
   @override
   Widget build(BuildContext context) {
+    final labelColor = isDiscount
+        ? AppColors.success
+        : isTotal ? AppColors.onSurface : AppColors.onSurfaceVariant;
+    final displayValue = isDiscount
+        ? '- IQD ${value.toStringAsFixed(0)}'
+        : 'IQD ${value.toStringAsFixed(0)}';
+
     return Row(
       children: [
         Text(label,
             style: TextStyle(
               fontSize: isTotal ? 14 : 12,
-              fontWeight:
-                  isTotal ? FontWeight.bold : FontWeight.normal,
-              color: isTotal
-                  ? AppColors.onSurface
-                  : AppColors.onSurfaceVariant,
+              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+              color: labelColor,
             )),
         const Spacer(),
-        Text('IQD ${value.toStringAsFixed(0)}',
+        Text(displayValue,
             style: TextStyle(
               fontSize: isTotal ? 16 : 12,
               fontWeight: FontWeight.bold,
-              color: isTotal ? AppColors.primary : AppColors.onSurface,
+              color: isDiscount ? AppColors.success : isTotal ? AppColors.primary : AppColors.onSurface,
             )),
       ],
     );
@@ -725,25 +807,37 @@ class _TotRow extends StatelessWidget {
 
 class _PaymentPanel extends StatelessWidget {
   final double total;
+  final double totalBeforeTip;
+  final double tip;
   final double change;
   final PaymentMethod method;
   final TextEditingController cashController;
+  final TextEditingController tipController;
   final List<double> quickAmounts;
   final bool canComplete;
   final void Function(PaymentMethod) onMethodChange;
   final void Function(double) onQuickAmount;
+  final void Function(double) onTipChange;
+  final int splitCount;
+  final void Function(int) onSplitChange;
   final VoidCallback onComplete;
   final VoidCallback onClose;
 
   const _PaymentPanel({
     required this.total,
+    required this.totalBeforeTip,
+    required this.tip,
     required this.change,
     required this.method,
     required this.cashController,
+    required this.tipController,
     required this.quickAmounts,
     required this.canComplete,
     required this.onMethodChange,
     required this.onQuickAmount,
+    required this.onTipChange,
+    required this.splitCount,
+    required this.onSplitChange,
     required this.onComplete,
     required this.onClose,
   });
@@ -756,7 +850,7 @@ class _PaymentPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header
+          // Header — fixed
           Row(
             children: [
               const Text('Payment',
@@ -775,63 +869,80 @@ class _PaymentPanel extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          // Method tabs
-          Row(
-            children: [
-              _MethodTab(
-                icon: Icons.payments_outlined,
-                label: 'Cash',
-                selected: method == PaymentMethod.cash,
-                onTap: () => onMethodChange(PaymentMethod.cash),
-              ),
-              const SizedBox(width: 8),
-              _MethodTab(
-                icon: Icons.credit_card_rounded,
-                label: 'Card',
-                selected: method == PaymentMethod.card,
-                onTap: () => onMethodChange(PaymentMethod.card),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          // Total display
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceLow,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                const Text('Total',
-                    style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.onSurfaceVariant)),
-                const Spacer(),
-                Text('IQD ${total.toStringAsFixed(0)}',
-                    style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.onSurface)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Variable section
+          const SizedBox(height: 12),
+          // Scrollable middle section
           Expanded(
-            child: method == PaymentMethod.cash
-                ? _CashSection(
-                    controller: cashController,
-                    total: total,
-                    change: change,
-                    quickAmounts: quickAmounts,
-                    onQuickAmount: onQuickAmount,
-                  )
-                : const _CardSection(),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Method tabs
+                  Row(
+                    children: [
+                      _MethodTab(
+                        icon: Icons.payments_outlined,
+                        label: 'Cash',
+                        selected: method == PaymentMethod.cash,
+                        onTap: () => onMethodChange(PaymentMethod.cash),
+                      ),
+                      const SizedBox(width: 8),
+                      _MethodTab(
+                        icon: Icons.credit_card_rounded,
+                        label: 'Card',
+                        selected: method == PaymentMethod.card,
+                        onTap: () => onMethodChange(PaymentMethod.card),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Total display
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceLow,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        const Text('Total',
+                            style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant)),
+                        const Spacer(),
+                        Text('IQD ${total.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.onSurface)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Split bill
+                  _SplitBillRow(total: total, splitCount: splitCount, onSplitChange: onSplitChange),
+                  const SizedBox(height: 12),
+                  // Tip
+                  _TipRow(
+                    totalBeforeTip: totalBeforeTip,
+                    tip: tip,
+                    controller: tipController,
+                    onTipChange: onTipChange,
+                  ),
+                  const SizedBox(height: 12),
+                  // Cash / Card section
+                  method == PaymentMethod.cash
+                      ? _CashSection(
+                          controller: cashController,
+                          total: total,
+                          change: change,
+                          quickAmounts: quickAmounts,
+                          onQuickAmount: onQuickAmount,
+                        )
+                      : const _CardSection(),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
-          // Complete button
+          const SizedBox(height: 12),
+          // Complete button — always visible at bottom
           SizedBox(
             height: 52,
             child: ElevatedButton.icon(
@@ -853,6 +964,187 @@ class _PaymentPanel extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SplitBillRow extends StatelessWidget {
+  final double total;
+  final int splitCount;
+  final void Function(int) onSplitChange;
+
+  const _SplitBillRow({
+    required this.total,
+    required this.splitCount,
+    required this.onSplitChange,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final perPerson = splitCount > 1 ? total / splitCount : 0.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Split Bill',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.onSurfaceVariant),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            // Decrease
+            GestureDetector(
+              onTap: () { if (splitCount > 1) onSplitChange(splitCount - 1); },
+              child: Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceLow,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.outlineVariant),
+                ),
+                child: const Icon(Icons.remove_rounded, size: 16, color: AppColors.onSurface),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              splitCount == 1 ? 'No split' : '$splitCount guests',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.onSurface),
+            ),
+            const SizedBox(width: 8),
+            // Increase
+            GestureDetector(
+              onTap: () { if (splitCount < 20) onSplitChange(splitCount + 1); },
+              child: Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceLow,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.outlineVariant),
+                ),
+                child: const Icon(Icons.add_rounded, size: 16, color: AppColors.onSurface),
+              ),
+            ),
+            if (splitCount > 1) ...[
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryFixed,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'IQD ${perPerson.toStringAsFixed(0)} / person',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _TipRow extends StatelessWidget {
+  final double totalBeforeTip;
+  final double tip;
+  final TextEditingController controller;
+  final void Function(double) onTipChange;
+
+  const _TipRow({
+    required this.totalBeforeTip,
+    required this.tip,
+    required this.controller,
+    required this.onTipChange,
+  });
+
+  static const _presets = [5, 10, 15, 20];
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Tip (optional)',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.onSurfaceVariant),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            // Quick % presets
+            ..._presets.map((pct) {
+              final amount = totalBeforeTip * pct / 100;
+              final isSelected = (tip - amount).abs() < 0.01;
+              return GestureDetector(
+                onTap: () {
+                  onTipChange(isSelected ? 0 : amount);
+                  controller.text = isSelected ? '' : amount.toStringAsFixed(0);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 120),
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primaryFixed : AppColors.surfaceLow,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isSelected ? AppColors.primary : AppColors.outlineVariant,
+                    ),
+                  ),
+                  child: Text(
+                    '$pct%',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? AppColors.primary : AppColors.onSurface,
+                    ),
+                  ),
+                ),
+              );
+            }),
+            // Custom amount field
+            Expanded(
+              child: SizedBox(
+                height: 34,
+                child: TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(fontSize: 13, color: AppColors.onSurface),
+                  onChanged: (v) => onTipChange(double.tryParse(v) ?? 0),
+                  decoration: InputDecoration(
+                    hintText: 'Custom',
+                    hintStyle: const TextStyle(fontSize: 12, color: AppColors.outline),
+                    prefixText: 'IQD  ',
+                    prefixStyle: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    isDense: true,
+                    filled: true,
+                    fillColor: AppColors.surfaceLow,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppColors.outlineVariant),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppColors.outlineVariant),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -927,7 +1219,7 @@ class _CashSection extends StatelessWidget {
                   ))
               .toList(),
         ),
-        const Spacer(),
+        const SizedBox(height: 12),
         // Change display
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),

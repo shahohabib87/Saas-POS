@@ -8,6 +8,13 @@ class ModifierOption {
     required this.name,
     required this.price,
   });
+
+  ModifierOption copyWith({String? id, String? name, double? price}) =>
+      ModifierOption(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        price: price ?? this.price,
+      );
 }
 
 class ModifierGroup {
@@ -15,9 +22,20 @@ class ModifierGroup {
   final bool multiSelect;
   final List<ModifierOption> options;
 
-  const ModifierGroup({
+  ModifierGroup({
     required this.name,
     required this.multiSelect,
     required this.options,
   });
+
+  ModifierGroup copyWith({
+    String? name,
+    bool? multiSelect,
+    List<ModifierOption>? options,
+  }) =>
+      ModifierGroup(
+        name: name ?? this.name,
+        multiSelect: multiSelect ?? this.multiSelect,
+        options: options ?? this.options,
+      );
 }

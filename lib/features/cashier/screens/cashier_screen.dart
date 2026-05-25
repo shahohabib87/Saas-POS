@@ -9,6 +9,9 @@ import 'package:easycasher/features/cashier/widgets/cashier_sidebar.dart';
 import 'package:easycasher/features/cashier/widgets/cashier_search_bar.dart';
 import 'package:easycasher/features/kitchen/screens/kds_screen.dart';
 import 'package:easycasher/features/orders/screens/orders_screen.dart';
+import 'package:easycasher/features/delivery/screens/delivery_screen.dart';
+import 'package:easycasher/features/delivery/screens/delivery_apps_screen.dart';
+import 'package:easycasher/features/menu/screens/menu_screen.dart';
 import 'package:easycasher/features/settings/screens/settings_screen.dart';
 import 'package:easycasher/features/tables/providers/tables_provider.dart';
 import 'package:easycasher/features/tables/screens/tables_screen.dart';
@@ -24,9 +27,12 @@ class CashierScreen extends ConsumerWidget {
 
     final showKds      = appView == AppView.kds;
     final showOrders   = appView == AppView.orders;
+    final showDelivery = appView == AppView.delivery;
+    final showTalabat  = appView == AppView.talabat;
     final showSettings = appView == AppView.settings;
+    final showMenu     = appView == AppView.menu;
     final showTablesMap =
-        !showKds && !showOrders && !showSettings &&
+        !showKds && !showOrders && !showDelivery && !showTalabat && !showSettings && !showMenu &&
         orderType == OrderType.dineIn && activeTable == null;
 
     return Scaffold(
@@ -39,26 +45,32 @@ class CashierScreen extends ConsumerWidget {
                 ? const KdsScreen()
                 : showOrders
                     ? const OrdersScreen()
-                    : showSettings
-                        ? const SettingsScreen()
-                        : Column(
-                            children: [
-                              const _TopHeader(),
-                              Expanded(
-                                child: showTablesMap
-                                    ? const TablesScreen()
-                                    : const Row(
-                                        children: [
-                                          Expanded(child: _MenuSection()),
-                                          _VerticalDivider(),
-                                          SizedBox(
-                                              width: 380,
-                                              child: CartPanel()),
-                                        ],
+                    : showDelivery
+                        ? const DeliveryScreen()
+                        : showTalabat
+                            ? const DeliveryAppsScreen()
+                            : showSettings
+                                ? const SettingsScreen()
+                                : showMenu
+                                    ? const MenuScreen()
+                                    : Column(
+                                    children: [
+                                      const _TopHeader(),
+                                      Expanded(
+                                        child: showTablesMap
+                                            ? const TablesScreen()
+                                            : const Row(
+                                                children: [
+                                                  Expanded(child: _MenuSection()),
+                                                  _VerticalDivider(),
+                                                  SizedBox(
+                                                      width: 380,
+                                                      child: CartPanel()),
+                                                ],
+                                              ),
                                       ),
-                              ),
-                            ],
-                          ),
+                                    ],
+                                  ),
           ),
         ],
       ),

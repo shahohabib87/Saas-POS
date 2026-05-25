@@ -54,11 +54,16 @@ class KitchenOrder {
     required this.createdAt,
   });
 
-  KitchenOrder copyWith({KotStatus? status, List<KotItem>? items}) => KitchenOrder(
+  KitchenOrder copyWith({
+    KotStatus? status,
+    List<KotItem>? items,
+    String? tableId,
+    String? tableLabel,
+  }) => KitchenOrder(
         id: id,
         kotNumber: kotNumber,
-        tableId: tableId,
-        tableLabel: tableLabel,
+        tableId: tableId ?? this.tableId,
+        tableLabel: tableLabel ?? this.tableLabel,
         items: items ?? this.items,
         status: status ?? this.status,
         orderType: orderType,

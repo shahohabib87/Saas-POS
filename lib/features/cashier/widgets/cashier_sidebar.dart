@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easycasher/core/constants/app_colors.dart';
+import 'package:easycasher/features/auth/models/app_permission.dart';
 import 'package:easycasher/features/auth/models/staff.dart';
 import 'package:easycasher/features/auth/providers/auth_provider.dart';
 import 'package:easycasher/features/cashier/providers/cashier_provider.dart';
@@ -12,11 +13,24 @@ class CashierSidebar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final orderType = ref.watch(orderTypeProvider);
-    final appView = ref.watch(appViewProvider);
-    final pendingKots = ref.watch(pendingKotCountProvider);
-    final staff = ref.watch(currentStaffProvider);
-    final canViewKds = staff?.role.canViewKitchen ?? false;
+    final orderType    = ref.watch(orderTypeProvider);
+    final appView      = ref.watch(appViewProvider);
+    final pendingKots  = ref.watch(pendingKotCountProvider);
+    final permissions  = ref.watch(currentPermissionsProvider);
+
+    final showTables      = permissions.contains(AppPermission.tables);
+    final showTakeout     = permissions.contains(AppPermission.takeout);
+    final showDelivery    = permissions.contains(AppPermission.delivery);
+    final showDeliveryApp = permissions.contains(AppPermission.deliveryApp);
+    final showOrders      = permissions.contains(AppPermission.orders);
+    final showKds         = permissions.contains(AppPermission.kitchenDisplay);
+    final showTalabat     = permissions.contains(AppPermission.talabat);
+    final showDeliveryScr = permissions.contains(AppPermission.deliveryScreen);
+    final showSettings    = permissions.contains(AppPermission.settings);
+    final showMenu        = permissions.contains(AppPermission.menuManagement);
+
+    final hasOrderTypes = showTables || showTakeout || showDelivery || showDeliveryApp;
+    final hasScreens    = showOrders || showKds || showTalabat || showDeliveryScr || showSettings || showMenu;
 
     return Container(
       width: 220,
@@ -27,13 +41,15 @@ class CashierSidebar extends ConsumerWidget {
           _SidebarHeader(),
           const SizedBox(height: 16),
           // New Order button — only in POS view
-          if (appView == AppView.pos) ...[
+          if (appView == AppView.pos)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: ElevatedButton.icon(
                 onPressed: () {
+                  ref.read(orderCounterProvider.notifier).state++;
                   ref.read(cartProvider.notifier).clear();
                   ref.read(orderNoteProvider.notifier).state = '';
+                  ref.read(discountValueProvider.notifier).state = 0;
                 },
                 icon: const Icon(Icons.add_rounded, size: 16),
                 label: const Text('New Order'),
@@ -49,6 +65,8 @@ class CashierSidebar extends ConsumerWidget {
                 ),
               ),
             ),
+          // ORDER TYPE section
+          if (hasOrderTypes) ...[
             const SizedBox(height: 20),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 18),
@@ -63,72 +81,100 @@ class CashierSidebar extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 6),
-            _NavItem(
-              icon: Icons.table_restaurant_rounded,
-              label: 'Tables',
-              type: OrderType.dineIn,
-              selected: orderType,
-            ),
-            _NavItem(
-              icon: Icons.shopping_bag_outlined,
-              label: 'Takeout',
-              type: OrderType.takeaway,
-              selected: orderType,
-            ),
-            _NavItem(
-              icon: Icons.delivery_dining_rounded,
-              label: 'Delivery',
-              type: OrderType.delivery,
-              selected: orderType,
-            ),
+            if (showTables)
+              _NavItem(
+                icon: Icons.table_restaurant_rounded,
+                label: 'Tables',
+                type: OrderType.dineIn,
+                selected: orderType,
+              ),
+            if (showTakeout)
+              _NavItem(
+                icon: Icons.shopping_bag_outlined,
+                label: 'Takeout',
+                type: OrderType.takeaway,
+                selected: orderType,
+              ),
+            if (showDelivery)
+              _NavItem(
+                icon: Icons.delivery_dining_rounded,
+                label: 'Delivery',
+                type: OrderType.delivery,
+                selected: orderType,
+              ),
+            if (showDeliveryApp)
+              _NavItem(
+                icon: Icons.phone_android_rounded,
+                label: 'Delivery App',
+                type: OrderType.deliveryApp,
+                selected: orderType,
+              ),
           ],
-          // Screens section
-          const SizedBox(height: 20),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 18),
-            child: Text(
-              'SCREENS',
-              style: TextStyle(
-                color: Colors.white38,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.2,
+          // SCREENS section
+          if (hasScreens) ...[
+            const SizedBox(height: 20),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 18),
+              child: Text(
+                'SCREENS',
+                style: TextStyle(
+                  color: Colors.white38,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 6),
-          _ViewNavItem(
-            icon: Icons.receipt_long_rounded,
-            label: 'Orders',
-            badge: 0,
-            view: AppView.orders,
-            selected: appView,
-          ),
-          if (canViewKds) ...[
-            _ViewNavItem(
-              icon: Icons.kitchen_rounded,
-              label: 'Kitchen Display',
-              badge: pendingKots,
-              view: AppView.kds,
-              selected: appView,
-            ),
+            const SizedBox(height: 6),
+            if (showOrders)
+              _ViewNavItem(
+                icon: Icons.receipt_long_rounded,
+                label: 'Orders',
+                badge: 0,
+                view: AppView.orders,
+                selected: appView,
+              ),
+            if (showKds)
+              _ViewNavItem(
+                icon: Icons.kitchen_rounded,
+                label: 'Kitchen Display',
+                badge: pendingKots,
+                view: AppView.kds,
+                selected: appView,
+              ),
+            if (showTalabat)
+              _ViewNavItem(
+                icon: Icons.delivery_dining_rounded,
+                label: 'Talabat',
+                badge: 0,
+                view: AppView.talabat,
+                selected: appView,
+              ),
+            if (showDeliveryScr)
+              _ViewNavItem(
+                icon: Icons.delivery_dining_rounded,
+                label: 'Delivery',
+                badge: 0,
+                view: AppView.delivery,
+                selected: appView,
+              ),
+            if (showMenu)
+              _ViewNavItem(
+                icon: Icons.restaurant_menu_rounded,
+                label: 'Menu',
+                badge: 0,
+                view: AppView.menu,
+                selected: appView,
+              ),
+            if (showSettings)
+              _ViewNavItem(
+                icon: Icons.settings_rounded,
+                label: 'Settings',
+                badge: 0,
+                view: AppView.settings,
+                selected: appView,
+              ),
           ],
-          if (staff?.role == StaffRole.manager || appView != AppView.pos)
-            _ViewNavItem(
-              icon: Icons.point_of_sale_rounded,
-              label: 'POS',
-              badge: 0,
-              view: AppView.pos,
-              selected: appView,
-            ),
-          if (staff?.role == StaffRole.manager)
-            _ViewNavItem(
-              icon: Icons.settings_rounded,
-              label: 'Settings',
-              badge: 0,
-              view: AppView.settings,
-              selected: appView,
-            ),
           const Spacer(),
           const Padding(
             padding: EdgeInsets.fromLTRB(14, 0, 14, 20),
@@ -200,7 +246,7 @@ class _NavItem extends ConsumerWidget {
     return GestureDetector(
       onTap: () {
         ref.read(orderTypeProvider.notifier).state = type;
-        // When switching to Tables, save any active table order and go back to map
+        ref.read(appViewProvider.notifier).state = AppView.pos;
         if (type == OrderType.dineIn) {
           final activeTable = ref.read(activeTableProvider);
           if (activeTable != null) {
@@ -212,14 +258,12 @@ class _NavItem extends ConsumerWidget {
             ref.read(savedTableNotesProvider.notifier).update(
                   (s) => {...s, activeTable.id: currentNote},
                 );
-            // Table stays occupied until payment — never reset automatically
             ref.read(cartProvider.notifier).clear();
             ref.read(orderNoteProvider.notifier).state = '';
             ref.read(tableNumberProvider.notifier).state = '';
             ref.read(activeTableProvider.notifier).state = null;
           }
         } else {
-          // Leaving dine-in: clear active table
           ref.read(activeTableProvider.notifier).state = null;
         }
       },
@@ -240,19 +284,15 @@ class _NavItem extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            Icon(
-              icon,
-              size: 18,
-              color: isSelected ? Colors.white : Colors.white54,
-            ),
+            Icon(icon, size: 18,
+                color: isSelected ? Colors.white : Colors.white54),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 label,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight:
-                      isSelected ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                   color: isSelected ? Colors.white : Colors.white60,
                 ),
               ),
@@ -378,8 +418,7 @@ class _ViewNavItem extends ConsumerWidget {
         ),
         child: Row(
           children: [
-            Icon(icon,
-                size: 18,
+            Icon(icon, size: 18,
                 color: isSelected ? Colors.white : Colors.white54),
             const SizedBox(width: 10),
             Expanded(
@@ -387,16 +426,14 @@ class _ViewNavItem extends ConsumerWidget {
                 label,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight:
-                      isSelected ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
                   color: isSelected ? Colors.white : Colors.white60,
                 ),
               ),
             ),
             if (badge > 0)
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: AppColors.danger,
                   borderRadius: BorderRadius.circular(10),

@@ -1,26 +1,35 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easycasher/core/constants/app_colors.dart';
+import 'package:easycasher/features/auth/models/app_permission.dart';
 import 'package:easycasher/features/auth/models/staff.dart';
+import 'package:easycasher/features/auth/providers/auth_provider.dart';
 import 'package:easycasher/features/settings/models/app_settings.dart';
 import 'package:easycasher/features/settings/providers/settings_provider.dart';
+import 'package:easycasher/features/tables/models/restaurant_table.dart';
+import 'package:easycasher/features/tables/providers/tables_provider.dart';
 
-enum _Section { restaurant, serviceMode, tax, receipt, staff }
+enum _Section { restaurant, serviceMode, tax, receipt, staff, tables, permissions }
 
 extension _SectionX on _Section {
   String get label => switch (this) {
-        _Section.restaurant => 'Restaurant',
+        _Section.restaurant  => 'Restaurant',
         _Section.serviceMode => 'Service Mode',
-        _Section.tax => 'Tax',
-        _Section.receipt => 'Receipt',
-        _Section.staff => 'Staff',
+        _Section.tax         => 'Tax',
+        _Section.receipt     => 'Receipt',
+        _Section.staff       => 'Staff',
+        _Section.tables      => 'Tables',
+        _Section.permissions => 'Permissions',
       };
   IconData get icon => switch (this) {
-        _Section.restaurant => Icons.storefront_rounded,
+        _Section.restaurant  => Icons.storefront_rounded,
         _Section.serviceMode => Icons.restaurant_rounded,
-        _Section.tax => Icons.percent_rounded,
-        _Section.receipt => Icons.receipt_long_rounded,
-        _Section.staff => Icons.people_rounded,
+        _Section.tax         => Icons.percent_rounded,
+        _Section.receipt     => Icons.receipt_long_rounded,
+        _Section.staff       => Icons.people_rounded,
+        _Section.tables      => Icons.table_restaurant_rounded,
+        _Section.permissions => Icons.shield_rounded,
       };
 }
 
@@ -58,14 +67,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
 // ─── Left navigation ────────────────────────────────────────────────────────
 
-class _SettingsNav extends StatelessWidget {
+class _SettingsNav extends ConsumerWidget {
   final _Section active;
   final ValueChanged<_Section> onSelect;
 
   const _SettingsNav({required this.active, required this.onSelect});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final staff       = ref.watch(currentStaffProvider);
+    final permissions = ref.watch(currentPermissionsProvider);
+    final isAdmin     = staff?.role == StaffRole.admin;
+    final canManageTables = permissions.contains(AppPermission.tableManagement);
+
+    final visible = _Section.values.where((s) {
+      if (s == _Section.permissions) return isAdmin;
+      if (s == _Section.tables) return canManageTables;
+      return true;
+    }).toList();
+
     return Container(
       width: 220,
       color: AppColors.sidebar,
@@ -97,7 +117,7 @@ class _SettingsNav extends StatelessWidget {
           ),
           Container(height: 1, color: Colors.white12),
           const SizedBox(height: 8),
-          for (final s in _Section.values)
+          for (final s in visible)
             _NavItem(
               section: s,
               isActive: s == active,
@@ -176,13 +196,13 @@ class _SectionContent extends ConsumerWidget {
     return ColoredBox(
       color: AppColors.background,
       child: switch (section) {
-        _Section.restaurant =>
-          _RestaurantSection(settings: settings),
-        _Section.serviceMode =>
-          _ServiceModeSection(settings: settings),
-        _Section.tax => _TaxSection(settings: settings),
-        _Section.receipt => _ReceiptSection(settings: settings),
-        _Section.staff => const _StaffSection(),
+        _Section.restaurant  => _RestaurantSection(settings: settings),
+        _Section.serviceMode => _ServiceModeSection(settings: settings),
+        _Section.tax         => _TaxSection(settings: settings),
+        _Section.receipt     => _ReceiptSection(settings: settings),
+        _Section.staff       => const _StaffSection(),
+        _Section.tables      => const _TablesSection(),
+        _Section.permissions => const _PermissionsSection(),
       },
     );
   }
@@ -887,9 +907,10 @@ class _RoleBadge extends StatelessWidget {
   const _RoleBadge({required this.role});
 
   Color get _color => switch (role) {
+        StaffRole.admin   => const Color(0xFFDC2626),
         StaffRole.manager => const Color(0xFF7C3AED),
         StaffRole.cashier => const Color(0xFF0369A1),
-        StaffRole.waiter => const Color(0xFF065F46),
+        StaffRole.waiter  => const Color(0xFF065F46),
         StaffRole.kitchen => const Color(0xFFB45309),
       };
 
@@ -1110,6 +1131,524 @@ class _StaffDialogState extends State<_StaffDialog> {
           child: Text(isEdit ? 'Save' : 'Add'),
         ),
       ],
+    );
+  }
+}
+
+// ─── Permissions section (admin only) ────────────────────────────────────────
+
+class _PermissionsSection extends ConsumerStatefulWidget {
+  const _PermissionsSection();
+
+  @override
+  ConsumerState<_PermissionsSection> createState() =>
+      _PermissionsSectionState();
+}
+
+class _PermissionsSectionState extends ConsumerState<_PermissionsSection> {
+  // Admin permissions are fixed — exclude from editor
+  static const _editableRoles = [
+    StaffRole.manager,
+    StaffRole.cashier,
+    StaffRole.waiter,
+    StaffRole.kitchen,
+  ];
+
+  StaffRole _selectedRole = StaffRole.cashier;
+
+  @override
+  Widget build(BuildContext context) {
+    final rolePerms = ref.watch(rolePermissionsProvider);
+    final perms = rolePerms[_selectedRole] ?? {};
+
+    return _SectionShell(
+      title: 'Permissions',
+      subtitle: 'Control which sections each role can access',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Role selector
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'SELECT ROLE',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.onSurfaceVariant,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  children: _editableRoles.map((role) {
+                    final isSelected = role == _selectedRole;
+                    final color = _roleColor(role);
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedRole = role),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 120),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? color.withValues(alpha: 0.12)
+                              : AppColors.surfaceLow,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSelected ? color : AppColors.outlineVariant,
+                            width: isSelected ? 2 : 1,
+                          ),
+                        ),
+                        child: Text(
+                          role.label,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isSelected ? color : AppColors.onSurface,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Permission toggles
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'PERMISSIONS FOR ${_selectedRole.label.toUpperCase()}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.onSurfaceVariant,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Toggle which sections this role can see in the sidebar.',
+                  style: TextStyle(
+                      fontSize: 12, color: AppColors.onSurfaceVariant),
+                ),
+                const SizedBox(height: 16),
+                for (int i = 0; i < AppPermission.values.length; i++) ...[
+                  if (i > 0)
+                    const Divider(height: 1, color: AppColors.outlineVariant),
+                  _PermissionTile(
+                    permission: AppPermission.values[i],
+                    enabled: perms.contains(AppPermission.values[i]),
+                    onChanged: (val) => ref
+                        .read(rolePermissionsProvider.notifier)
+                        .setPermission(_selectedRole, AppPermission.values[i], val),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _roleColor(StaffRole role) => switch (role) {
+        StaffRole.admin   => const Color(0xFFDC2626),
+        StaffRole.manager => const Color(0xFF7C3AED),
+        StaffRole.cashier => const Color(0xFF0369A1),
+        StaffRole.waiter  => const Color(0xFF065F46),
+        StaffRole.kitchen => const Color(0xFFB45309),
+      };
+}
+
+class _PermissionTile extends StatelessWidget {
+  final AppPermission permission;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  const _PermissionTile({
+    required this.permission,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  permission.label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  permission.description,
+                  style: const TextStyle(
+                      fontSize: 11, color: AppColors.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            value: enabled,
+            activeThumbColor: AppColors.primary,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Tables section ───────────────────────────────────────────────────────────
+
+class _TablesSection extends ConsumerWidget {
+  const _TablesSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tables = ref.watch(tablesProvider);
+
+    return _SectionShell(
+      title: 'Tables',
+      subtitle: 'Add, edit, or remove dining tables',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Spacer(),
+              ElevatedButton.icon(
+                onPressed: () => _showDialog(context, ref, null),
+                icon: const Icon(Icons.add_rounded, size: 16),
+                label: const Text('Add Table'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                  textStyle: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _Card(
+            child: tables.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: Text(
+                        'No tables yet. Tap "Add Table" to get started.',
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.onSurfaceVariant),
+                      ),
+                    ),
+                  )
+                : Column(
+                    children: [
+                      for (int i = 0; i < tables.length; i++) ...[
+                        if (i > 0)
+                          const Divider(
+                              height: 1, color: AppColors.outlineVariant),
+                        _TableRow(
+                          table: tables[i],
+                          onEdit: () => _showDialog(context, ref, tables[i]),
+                          onDelete: () =>
+                              _confirmDelete(context, ref, tables[i]),
+                        ),
+                      ],
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDialog(BuildContext context, WidgetRef ref, RestaurantTable? existing) {
+    showDialog(
+      context: context,
+      builder: (_) => _TableDialog(
+        existing: existing,
+        suggestedNumber:
+            ref.read(tablesProvider.notifier).nextSuggestedNumber(),
+        onSave: (number, capacity) {
+          if (existing == null) {
+            ref.read(tablesProvider.notifier).add(number, capacity);
+          } else {
+            ref
+                .read(tablesProvider.notifier)
+                .update(existing.id, number: number, capacity: capacity);
+          }
+        },
+      ),
+    );
+  }
+
+  void _confirmDelete(
+      BuildContext context, WidgetRef ref, RestaurantTable table) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Text('Delete Table?',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        content: Text(
+          'Remove Table ${table.number}? This cannot be undone.',
+          style: const TextStyle(
+              fontSize: 13, color: AppColors.onSurfaceVariant),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              ref.read(tablesProvider.notifier).remove(table.id);
+              Navigator.pop(ctx);
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TableRow extends StatelessWidget {
+  final RestaurantTable table;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _TableRow(
+      {required this.table, required this.onEdit, required this.onDelete});
+
+  Color get _statusColor => switch (table.status) {
+        TableStatus.available => AppColors.success,
+        TableStatus.occupied  => AppColors.warning,
+        TableStatus.reserved  => AppColors.outline,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: _statusColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.table_restaurant_rounded,
+                color: _statusColor, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Table ${table.number}',
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.onSurface)),
+                const SizedBox(height: 2),
+                Text('${table.capacity} seats  •  ${table.status.name}',
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.onSurfaceVariant)),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit_rounded,
+                size: 18, color: AppColors.onSurfaceVariant),
+            onPressed: onEdit,
+            tooltip: 'Edit',
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline_rounded,
+                size: 18, color: AppColors.danger),
+            onPressed: table.status == TableStatus.occupied ? null : onDelete,
+            tooltip: table.status == TableStatus.occupied
+                ? 'Cannot delete occupied table'
+                : 'Delete',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TableDialog extends StatefulWidget {
+  final RestaurantTable? existing;
+  final int suggestedNumber;
+  final void Function(int number, int capacity) onSave;
+
+  const _TableDialog({
+    required this.existing,
+    required this.suggestedNumber,
+    required this.onSave,
+  });
+
+  @override
+  State<_TableDialog> createState() => _TableDialogState();
+}
+
+class _TableDialogState extends State<_TableDialog> {
+  late final TextEditingController _number;
+  late int _capacity;
+
+  static const _capacities = [2, 4, 6, 8, 10, 12];
+
+  @override
+  void initState() {
+    super.initState();
+    _number = TextEditingController(
+      text: (widget.existing?.number ?? widget.suggestedNumber).toString(),
+    );
+    _capacity = widget.existing?.capacity ?? 4;
+    if (!_capacities.contains(_capacity)) _capacity = 4;
+  }
+
+  @override
+  void dispose() {
+    _number.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final number = int.tryParse(_number.text.trim());
+    if (number == null || number < 1) return;
+    widget.onSave(number, _capacity);
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEdit = widget.existing != null;
+    return Dialog(
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: SizedBox(
+        width: 340,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isEdit ? 'Edit Table' : 'Add Table',
+                style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.onSurface),
+              ),
+              const SizedBox(height: 20),
+              const _FieldLabel('TABLE NUMBER'),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _number,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: _inputDec('e.g. 1'),
+                style: const TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              const _FieldLabel('CAPACITY (SEATS)'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: _capacities.map((c) {
+                  final sel = c == _capacity;
+                  return GestureDetector(
+                    onTap: () => setState(() => _capacity = c),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 120),
+                      width: 52,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: sel ? AppColors.primary : AppColors.surfaceLow,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: sel
+                              ? AppColors.primary
+                              : AppColors.outlineVariant,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '$c',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: sel ? Colors.white : AppColors.onSurface,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
+                    ),
+                    onPressed: _save,
+                    child: Text(isEdit ? 'Save' : 'Add Table'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

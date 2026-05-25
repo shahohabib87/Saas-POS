@@ -13,10 +13,15 @@ class RestaurantTable {
     this.status = TableStatus.available,
   });
 
-  RestaurantTable copyWith({TableStatus? status}) => RestaurantTable(
+  RestaurantTable copyWith({
+    int? number,
+    int? capacity,
+    TableStatus? status,
+  }) =>
+      RestaurantTable(
         id: id,
-        number: number,
-        capacity: capacity,
+        number: number ?? this.number,
+        capacity: capacity ?? this.capacity,
         status: status ?? this.status,
       );
 }

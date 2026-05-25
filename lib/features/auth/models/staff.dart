@@ -1,25 +1,32 @@
-enum StaffRole { waiter, cashier, kitchen, manager }
+enum StaffRole { admin, waiter, cashier, kitchen, manager }
 
 extension StaffRoleX on StaffRole {
   String get label => switch (this) {
-        StaffRole.waiter => 'Waiter',
+        StaffRole.admin   => 'Admin',
+        StaffRole.waiter  => 'Waiter',
         StaffRole.cashier => 'Cashier',
         StaffRole.kitchen => 'Kitchen',
         StaffRole.manager => 'Manager',
       };
 
   bool get canTakeOrders =>
-      this == StaffRole.waiter || this == StaffRole.manager;
+      this == StaffRole.waiter ||
+      this == StaffRole.manager ||
+      this == StaffRole.admin;
 
   bool get canProcessPayment =>
-      this == StaffRole.cashier || this == StaffRole.manager;
+      this == StaffRole.cashier ||
+      this == StaffRole.manager ||
+      this == StaffRole.admin;
 
   bool get canViewKitchen =>
-      this == StaffRole.kitchen || this == StaffRole.manager;
+      this == StaffRole.kitchen ||
+      this == StaffRole.manager ||
+      this == StaffRole.admin;
 
-  bool get canVoid => this == StaffRole.manager;
+  bool get canVoid => this == StaffRole.manager || this == StaffRole.admin;
 
-  bool get canViewReports => this == StaffRole.manager;
+  bool get canViewReports => this == StaffRole.manager || this == StaffRole.admin;
 }
 
 class Staff {
@@ -54,6 +61,7 @@ class Staff {
 
 // Demo staff — replace with DB in production
 const kDemoStaff = <Staff>[
+  Staff(id: 's0', name: 'Admin',   role: StaffRole.admin,   pin: '9999', avatar: '👨‍💻'),
   Staff(id: 's1', name: 'Ahmed',   role: StaffRole.waiter,  pin: '1234', avatar: '👨‍🍳'),
   Staff(id: 's2', name: 'Sara',    role: StaffRole.cashier, pin: '5678', avatar: '👩‍💼'),
   Staff(id: 's3', name: 'Kitchen', role: StaffRole.kitchen, pin: '1111', avatar: '🧑‍🍳'),

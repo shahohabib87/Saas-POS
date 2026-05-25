@@ -17,6 +17,7 @@ class StaffCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final roleColor = switch (staff.role) {
+      StaffRole.admin   => const Color(0xFFDC2626),
       StaffRole.manager => AppColors.primary,
       StaffRole.cashier => AppColors.success,
       StaffRole.waiter  => AppColors.warning,

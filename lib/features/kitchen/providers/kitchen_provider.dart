@@ -72,6 +72,17 @@ class KitchenNotifier extends StateNotifier<List<KitchenOrder>> {
     state = state.where((o) => o.tableId != tableId).toList();
   }
 
+  void transferTable(String fromTableId, String toTableId) {
+    final tableNum = toTableId.replaceAll(RegExp(r'[^0-9]'), '');
+    state = [
+      for (final o in state)
+        if (o.tableId == fromTableId)
+          o.copyWith(tableId: toTableId, tableLabel: 'Table $tableNum')
+        else
+          o,
+    ];
+  }
+
   int kotCountForTable(String tableId) =>
       state.where((o) => o.tableId == tableId).length;
 }

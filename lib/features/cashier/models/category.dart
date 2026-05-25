@@ -1,13 +1,17 @@
-import 'package:flutter/material.dart';
-
 class Category {
   final String id;
   final String name;
-  final IconData icon;
+  final String emoji;
 
   const Category({
     required this.id,
     required this.name,
-    required this.icon,
+    this.emoji = '🍽️',
   });
+
+  Category copyWith({String? id, String? name, String? emoji}) => Category(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        emoji: emoji ?? this.emoji,
+      );
 }

@@ -23,13 +23,18 @@ class CartPanel extends ConsumerWidget {
 
     final hasKots = tableKots.isNotEmpty;
     final subtotal = ref.watch(subtotalProvider);
+    final discountType = ref.watch(discountTypeProvider);
+    final discountValue = ref.watch(discountValueProvider);
 
     // Bill total = all KOTs + current cart
-    final kotSubtotal =
-        tableKots.fold(0.0, (s, o) => s + o.total);
+    final kotSubtotal = tableKots.fold(0.0, (s, o) => s + o.total);
     final billSubtotal = kotSubtotal + subtotal;
-    final billTax = billSubtotal * AppConstants.taxRate;
-    final billTotal = billSubtotal + billTax;
+    final discountAmount = discountType == DiscountType.percent
+        ? billSubtotal * (discountValue / 100)
+        : discountValue.clamp(0.0, billSubtotal);
+    final discountedSubtotal = billSubtotal - discountAmount;
+    final billTax = discountedSubtotal * AppConstants.taxRate;
+    final billTotal = discountedSubtotal + billTax;
 
     return Container(
       color: AppColors.surface,
@@ -66,8 +71,10 @@ class CartPanel extends ConsumerWidget {
           ),
           if (cartItems.isNotEmpty || hasKots) ...[
             Container(height: 1, color: AppColors.outlineVariant),
+            _DiscountRow(subtotal: billSubtotal),
             _TotalsSection(
               subtotal: billSubtotal,
+              discountAmount: discountAmount,
               tax: billTax,
               total: billTotal,
             ),
@@ -94,12 +101,13 @@ class _CartHeader extends ConsumerWidget {
     String typeLabel;
     switch (orderType) {
       case OrderType.dineIn:
-        typeLabel =
-            tableNumber.isEmpty ? 'Dine In' : 'Table $tableNumber  •  Dine In';
+        typeLabel = tableNumber.isEmpty ? 'Dine In' : 'Table $tableNumber';
       case OrderType.takeaway:
         typeLabel = 'Takeout';
       case OrderType.delivery:
         typeLabel = 'Delivery';
+      case OrderType.deliveryApp:
+        typeLabel = 'Delivery App';
     }
 
     // Derive kitchen status from KOTs
@@ -112,7 +120,7 @@ class _CartHeader extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(12, 14, 16, 12),
       child: Row(
         children: [
-          if (orderType == OrderType.dineIn && activeTable != null)
+          if (orderType == OrderType.dineIn && activeTable != null) ...[
             IconButton(
               onPressed: () => _backToTables(ref),
               icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 15),
@@ -121,13 +129,22 @@ class _CartHeader extends ConsumerWidget {
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
             ),
+            IconButton(
+              onPressed: () => _showTransferDialog(context, ref),
+              icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+              color: AppColors.onSurfaceVariant,
+              tooltip: 'Transfer table',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            ),
+          ],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Order #001',
-                  style: TextStyle(
+                Text(
+                  ref.watch(orderNumberProvider),
+                  style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
                     color: AppColors.onSurface,
@@ -173,11 +190,20 @@ class _CartHeader extends ConsumerWidget {
     );
   }
 
+  void _showTransferDialog(BuildContext context, WidgetRef ref) {
+    final activeTable = ref.read(activeTableProvider);
+    if (activeTable == null) return;
+    showDialog(
+      context: context,
+      builder: (_) => _TableTransferDialog(fromTable: activeTable, ref: ref),
+    );
+  }
+
   void _backToTables(WidgetRef ref) {
     final activeTable = ref.read(activeTableProvider);
     if (activeTable == null) return;
 
-    // Save current cart + note for this table
+    // Save current cart + note + covers for this table
     final currentCart = ref.read(cartProvider);
     final currentNote = ref.read(orderNoteProvider);
     ref.read(savedTableOrdersProvider.notifier).update(
@@ -187,11 +213,10 @@ class _CartHeader extends ConsumerWidget {
           (s) => {...s, activeTable.id: currentNote},
         );
 
-    // Table stays occupied until payment is confirmed — never reset on back press
-
     ref.read(cartProvider.notifier).clear();
     ref.read(orderNoteProvider.notifier).state = '';
     ref.read(tableNumberProvider.notifier).state = '';
+    ref.read(discountValueProvider.notifier).state = 0;
     ref.read(activeTableProvider.notifier).state = null;
   }
 }
@@ -384,20 +409,143 @@ class _CookingNoteFieldState extends ConsumerState<_CookingNoteField> {
   }
 }
 
+class _DiscountRow extends ConsumerStatefulWidget {
+  final double subtotal;
+  const _DiscountRow({required this.subtotal});
+
+  @override
+  ConsumerState<_DiscountRow> createState() => _DiscountRowState();
+}
+
+class _DiscountRowState extends ConsumerState<_DiscountRow> {
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    final v = ref.read(discountValueProvider);
+    _ctrl = TextEditingController(text: v > 0 ? v.toStringAsFixed(0) : '');
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final discountType = ref.watch(discountTypeProvider);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Row(
+        children: [
+          // Toggle %  / IQD
+          GestureDetector(
+            onTap: () {
+              ref.read(discountTypeProvider.notifier).state =
+                  discountType == DiscountType.percent
+                      ? DiscountType.fixed
+                      : DiscountType.percent;
+              ref.read(discountValueProvider.notifier).state = 0;
+              _ctrl.clear();
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceLow,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.outlineVariant),
+              ),
+              child: Text(
+                discountType == DiscountType.percent ? '%' : 'IQD',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SizedBox(
+              height: 36,
+              child: TextField(
+                controller: _ctrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                style: const TextStyle(fontSize: 13, color: AppColors.onSurface),
+                onChanged: (v) {
+                  final parsed = double.tryParse(v) ?? 0.0;
+                  final capped = discountType == DiscountType.percent
+                      ? parsed.clamp(0.0, 100.0)
+                      : parsed.clamp(0.0, widget.subtotal);
+                  ref.read(discountValueProvider.notifier).state = capped;
+                },
+                decoration: InputDecoration(
+                  hintText: discountType == DiscountType.percent ? 'Discount %' : 'Discount amount',
+                  hintStyle: const TextStyle(fontSize: 12, color: AppColors.outline),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  isDense: true,
+                  filled: true,
+                  fillColor: AppColors.surfaceLow,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.outlineVariant),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.outlineVariant),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                  ),
+                  suffixIcon: ref.watch(discountValueProvider) > 0
+                      ? GestureDetector(
+                          onTap: () {
+                            ref.read(discountValueProvider.notifier).state = 0;
+                            _ctrl.clear();
+                          },
+                          child: const Icon(Icons.clear_rounded, size: 16, color: AppColors.outline),
+                        )
+                      : null,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _TotalsSection extends StatelessWidget {
   final double subtotal;
+  final double discountAmount;
   final double tax;
   final double total;
 
-  const _TotalsSection(
-      {required this.subtotal, required this.tax, required this.total});
+  const _TotalsSection({
+    required this.subtotal,
+    required this.discountAmount,
+    required this.tax,
+    required this.total,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: Column(
         children: [
+          if (discountAmount > 0) ...[
+            _TotalRow(label: 'Subtotal', value: subtotal),
+            const SizedBox(height: 4),
+            _TotalRow(label: 'Discount', value: -discountAmount, isDiscount: true),
+            const SizedBox(height: 4),
+          ],
           _TotalRow(label: 'Total', value: total, isTotal: true),
         ],
       ),
@@ -409,33 +557,43 @@ class _TotalRow extends StatelessWidget {
   final String label;
   final double value;
   final bool isTotal;
+  final bool isDiscount;
 
-  const _TotalRow(
-      {required this.label, required this.value, this.isTotal = false});
+  const _TotalRow({
+    required this.label,
+    required this.value,
+    this.isTotal = false,
+    this.isDiscount = false,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final color = isDiscount
+        ? AppColors.success
+        : isTotal
+            ? AppColors.onSurface
+            : AppColors.onSurfaceVariant;
+    final displayValue = isDiscount
+        ? '- IQD ${value.abs().toStringAsFixed(0)}'
+        : 'IQD ${value.toStringAsFixed(0)}';
+
     return Row(
       children: [
         Text(
           label,
           style: TextStyle(
             fontSize: isTotal ? 14 : 13,
-            fontWeight:
-                isTotal ? FontWeight.bold : FontWeight.normal,
-            color: isTotal
-                ? AppColors.onSurface
-                : AppColors.onSurfaceVariant,
+            fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+            color: color,
           ),
         ),
         const Spacer(),
         Text(
-          'IQD ${value.toStringAsFixed(0)}',
+          displayValue,
           style: TextStyle(
             fontSize: isTotal ? 16 : 13,
             fontWeight: FontWeight.bold,
-            color:
-                isTotal ? AppColors.primary : AppColors.onSurface,
+            color: isTotal ? AppColors.primary : color,
           ),
         ),
       ],
@@ -481,22 +639,42 @@ class _ActionButtons extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
           ],
-          SizedBox(
-            width: double.infinity,
-            height: 40,
-            child: OutlinedButton.icon(
-              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Printing bill...')),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 40,
+                  child: OutlinedButton.icon(
+                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Printing bill...')),
+                    ),
+                    icon: const Icon(Icons.print_outlined, size: 16),
+                    label: const Text('Print Bill'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.onSurfaceVariant,
+                      side: const BorderSide(color: AppColors.outlineVariant),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
               ),
-              icon: const Icon(Icons.print_outlined, size: 16),
-              label: const Text('Print Bill'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.onSurfaceVariant,
-                side: const BorderSide(color: AppColors.outlineVariant),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 40,
+                child: OutlinedButton.icon(
+                  onPressed: () => _confirmVoid(context, ref),
+                  icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                  label: const Text('Void'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.danger,
+                    side: const BorderSide(color: AppColors.danger),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
           const SizedBox(height: 8),
           SizedBox(
@@ -524,9 +702,10 @@ class _ActionButtons extends ConsumerWidget {
   }
 
   KotOrderType _toKotOrderType(OrderType t) => switch (t) {
-    OrderType.dineIn   => KotOrderType.dineIn,
-    OrderType.takeaway => KotOrderType.takeout,
-    OrderType.delivery => KotOrderType.delivery,
+    OrderType.dineIn       => KotOrderType.dineIn,
+    OrderType.takeaway     => KotOrderType.takeout,
+    OrderType.delivery     => KotOrderType.delivery,
+    OrderType.deliveryApp  => KotOrderType.deliveryApp,
   };
 
   void _sendToKitchen(BuildContext context, WidgetRef ref) {
@@ -584,6 +763,67 @@ class _ActionButtons extends ConsumerWidget {
         cartItems: cartItems,
       ),
     );
+  }
+
+  void _confirmVoid(BuildContext context, WidgetRef ref) {
+    final activeTable = ref.read(activeTableProvider);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Text(
+          'Void Order',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+        ),
+        content: Text(
+          activeTable != null
+              ? 'This will void all items for Table ${activeTable.number} and free the table.'
+              : 'This will void all items in the current order.',
+          style: const TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.onSurfaceVariant)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _voidOrder(ref);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.danger,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            child: const Text('Void Order'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _voidOrder(WidgetRef ref) {
+    final activeTable = ref.read(activeTableProvider);
+
+    if (activeTable != null) {
+      ref.read(kitchenProvider.notifier).clearTable(activeTable.id);
+      ref.read(savedTableOrdersProvider.notifier).update(
+        (s) => Map.fromEntries(s.entries.where((e) => e.key != activeTable.id)),
+      );
+      ref.read(savedTableNotesProvider.notifier).update(
+        (s) => Map.fromEntries(s.entries.where((e) => e.key != activeTable.id)),
+      );
+      ref.read(tablesProvider.notifier).setStatus(activeTable.id, TableStatus.available);
+      ref.read(activeTableProvider.notifier).state = null;
+      ref.read(tableNumberProvider.notifier).state = '';
+    }
+
+    ref.read(cartProvider.notifier).clear();
+    ref.read(orderNoteProvider.notifier).state = '';
+    ref.read(discountValueProvider.notifier).state = 0;
   }
 }
 
@@ -853,6 +1093,114 @@ class _KitchenStatusChip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Table Transfer Dialog ─────────────────────────────────────────────────────
+
+class _TableTransferDialog extends ConsumerWidget {
+  final RestaurantTable fromTable;
+  final WidgetRef ref;
+  const _TableTransferDialog({required this.fromTable, required this.ref});
+
+  @override
+  Widget build(BuildContext context, WidgetRef widgetRef) {
+    final tables = widgetRef.watch(tablesProvider);
+    final available = tables
+        .where((t) => t.id != fromTable.id && t.status == TableStatus.available)
+        .toList();
+
+    return AlertDialog(
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      title: Text(
+        'Transfer Table ${fromTable.number}',
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+      ),
+      content: SizedBox(
+        width: 320,
+        child: available.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  'No available tables to transfer to.',
+                  style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
+                  textAlign: TextAlign.center,
+                ),
+              )
+            : Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: available.map((t) => _TransferTableChip(
+                  table: t,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _doTransfer(widgetRef, t);
+                  },
+                )).toList(),
+              ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel', style: TextStyle(color: AppColors.onSurfaceVariant)),
+        ),
+      ],
+    );
+  }
+
+  void _doTransfer(WidgetRef r, RestaurantTable toTable) {
+    final cart = r.read(cartProvider);
+    final note = r.read(orderNoteProvider);
+
+    r.read(savedTableOrdersProvider.notifier).update(
+      (s) => {...Map.from(s)..remove(fromTable.id), toTable.id: cart},
+    );
+    r.read(savedTableNotesProvider.notifier).update(
+      (s) => {...Map.from(s)..remove(fromTable.id), toTable.id: note},
+    );
+
+    r.read(kitchenProvider.notifier).transferTable(fromTable.id, toTable.id);
+    r.read(tablesProvider.notifier).setStatus(fromTable.id, TableStatus.available);
+    r.read(tablesProvider.notifier).setStatus(toTable.id, TableStatus.occupied);
+    r.read(activeTableProvider.notifier).state = toTable;
+    r.read(tableNumberProvider.notifier).state = toTable.number.toString();
+  }
+}
+
+class _TransferTableChip extends StatelessWidget {
+  final RestaurantTable table;
+  final VoidCallback onTap;
+  const _TransferTableChip({required this.table, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLow,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.outlineVariant),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.table_restaurant_rounded, size: 20, color: AppColors.success),
+            const SizedBox(height: 4),
+            Text(
+              'Table ${table.number}',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.onSurface),
+            ),
+            Text(
+              '${table.capacity} seats',
+              style: const TextStyle(fontSize: 10, color: AppColors.onSurfaceVariant),
+            ),
+          ],
+        ),
       ),
     );
   }

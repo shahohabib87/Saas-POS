@@ -9,6 +9,7 @@ class TableCard extends StatelessWidget {
   final bool hasSavedOrder;
   final TableKotStatus kotStatus;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   const TableCard({
     super.key,
@@ -16,6 +17,7 @@ class TableCard extends StatelessWidget {
     required this.hasSavedOrder,
     this.kotStatus = TableKotStatus.none,
     required this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -29,6 +31,7 @@ class TableCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: isReserved ? null : onTap,
+      onLongPress: onLongPress,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         decoration: BoxDecoration(
