@@ -46,7 +46,7 @@ class CashierSidebar extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: ElevatedButton.icon(
                 onPressed: () {
-                  ref.read(orderCounterProvider.notifier).state++;
+                  ref.read(orderCounterProvider.notifier).bump();
                   ref.read(cartProvider.notifier).clear();
                   ref.read(orderNoteProvider.notifier).state = '';
                   ref.read(discountValueProvider.notifier).state = 0;

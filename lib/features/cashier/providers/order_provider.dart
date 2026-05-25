@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:easycasher/core/database/app_database.dart';
+import 'package:easycasher/core/database/database_provider.dart';
 
 enum OrderType { dineIn, takeaway, delivery, deliveryApp }
 
@@ -13,8 +15,27 @@ final orderNoteProvider = StateProvider<String>((ref) => '');
 
 final appViewProvider = StateProvider<AppView>((ref) => AppView.pos);
 
-/// Auto-incrementing order counter — bump at the start of every new order.
-final orderCounterProvider = StateProvider<int>((ref) => 1);
+class OrderCounterNotifier extends StateNotifier<int> {
+  final AppDatabase _db;
+
+  OrderCounterNotifier(this._db) : super(0) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    state = await _db.loadTodayCounter();
+  }
+
+  void bump() {
+    state = state + 1;
+    _db.persistCounter(state);
+  }
+}
+
+final orderCounterProvider =
+    StateNotifierProvider<OrderCounterNotifier, int>(
+  (ref) => OrderCounterNotifier(ref.watch(appDatabaseProvider)),
+);
 
 final orderNumberProvider = Provider<String>((ref) {
   final n = ref.watch(orderCounterProvider);

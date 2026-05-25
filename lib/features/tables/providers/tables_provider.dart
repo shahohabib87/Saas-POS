@@ -1,28 +1,35 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:easycasher/core/database/app_database.dart';
+import 'package:easycasher/core/database/database_provider.dart';
 import 'package:easycasher/features/tables/models/restaurant_table.dart';
 
 final activeTableProvider = StateProvider<RestaurantTable?>((ref) => null);
 
 class TablesNotifier extends StateNotifier<List<RestaurantTable>> {
-  TablesNotifier() : super(_generate());
+  final AppDatabase _db;
 
-  // Track next id counter above the pre-seeded 20 tables
-  int _nextId = 21;
+  TablesNotifier(this._db) : super([]) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    state = await _db.getTables();
+  }
 
   void setStatus(String id, TableStatus status) {
     state = [
       for (final t in state)
         if (t.id == id) t.copyWith(status: status) else t,
     ];
+    final updated = state.firstWhere((t) => t.id == id);
+    _db.upsertTable(updated);
   }
 
   void add(int number, int capacity) {
-    final id = 'T$_nextId';
-    _nextId++;
-    state = [
-      ...state,
-      RestaurantTable(id: id, number: number, capacity: capacity),
-    ];
+    final id = 'T${DateTime.now().millisecondsSinceEpoch}';
+    final table = RestaurantTable(id: id, number: number, capacity: capacity);
+    state = [...state, table];
+    _db.upsertTable(table);
   }
 
   void update(String id, {required int number, required int capacity}) {
@@ -30,32 +37,22 @@ class TablesNotifier extends StateNotifier<List<RestaurantTable>> {
       for (final t in state)
         if (t.id == id) t.copyWith(number: number, capacity: capacity) else t,
     ];
+    final updated = state.firstWhere((t) => t.id == id);
+    _db.upsertTable(updated);
   }
 
   void remove(String id) {
     state = state.where((t) => t.id != id).toList();
+    _db.deleteTable(id);
   }
 
-  /// Returns the next suggested table number (max existing + 1).
   int nextSuggestedNumber() {
     if (state.isEmpty) return 1;
     return state.map((t) => t.number).reduce((a, b) => a > b ? a : b) + 1;
   }
-
-  static List<RestaurantTable> _generate() {
-    const capacities = [2, 4, 4, 6, 2, 4, 6, 2, 4, 4, 6, 2, 4, 2, 4, 6, 4, 2, 4, 6];
-    return [
-      for (int i = 0; i < 20; i++)
-        RestaurantTable(
-          id: 'T${i + 1}',
-          number: i + 1,
-          capacity: capacities[i],
-        ),
-    ];
-  }
 }
 
 final tablesProvider =
-    StateNotifierProvider<TablesNotifier, List<RestaurantTable>>(
-  (ref) => TablesNotifier(),
-);
+    StateNotifierProvider<TablesNotifier, List<RestaurantTable>>((ref) {
+  return TablesNotifier(ref.watch(appDatabaseProvider));
+});

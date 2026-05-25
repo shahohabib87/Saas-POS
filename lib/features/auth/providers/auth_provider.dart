@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:easycasher/features/auth/models/staff.dart';
+import 'package:easycasher/core/database/app_database.dart';
+import 'package:easycasher/core/database/database_provider.dart';
 import 'package:easycasher/features/auth/models/app_permission.dart';
+import 'package:easycasher/features/auth/models/staff.dart';
 
 enum LoginError { wrongPin, notFound }
 
@@ -50,25 +52,31 @@ final currentStaffProvider = Provider<Staff?>(
 
 class RolePermissionsNotifier
     extends StateNotifier<Map<StaffRole, Set<AppPermission>>> {
-  RolePermissionsNotifier()
-      : super({
-          for (final e in kDefaultRolePermissions.entries)
-            e.key: Set.from(e.value),
-        });
+  final AppDatabase _db;
+
+  RolePermissionsNotifier(this._db)
+      : super({for (final r in StaffRole.values) r: {}}) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    state = await _db.getRolePermissions();
+  }
 
   void setPermission(StaffRole role, AppPermission perm, bool enabled) {
-    if (role == StaffRole.admin) return; // admin always has all permissions
+    if (role == StaffRole.admin) return;
     final updated = Map<StaffRole, Set<AppPermission>>.from(state);
     final perms = Set<AppPermission>.from(updated[role] ?? {});
     enabled ? perms.add(perm) : perms.remove(perm);
     updated[role] = perms;
     state = updated;
+    _db.setRolePermission(role, perm, enabled);
   }
 }
 
 final rolePermissionsProvider = StateNotifierProvider<RolePermissionsNotifier,
     Map<StaffRole, Set<AppPermission>>>(
-  (ref) => RolePermissionsNotifier(),
+  (ref) => RolePermissionsNotifier(ref.watch(appDatabaseProvider)),
 );
 
 final currentPermissionsProvider = Provider<Set<AppPermission>>((ref) {

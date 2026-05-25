@@ -97,7 +97,7 @@ class _TablesScreenState extends ConsumerState<TablesScreen> {
     ref.read(activeTableProvider.notifier).state = freshTable;
 
     if (freshTable.status == TableStatus.available) {
-      ref.read(orderCounterProvider.notifier).state++;
+      ref.read(orderCounterProvider.notifier).bump();
       ref.read(tablesProvider.notifier).setStatus(table.id, TableStatus.occupied);
     }
   }
