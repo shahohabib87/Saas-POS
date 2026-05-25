@@ -184,8 +184,6 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         child: _showReceipt
             ? _ReceiptView(
                 payment: _completedPayment!,
-                kots: widget.kots,
-                cartItems: widget.cartItems,
                 onDone: _done,
               )
             : Row(
@@ -239,14 +237,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
 class _ReceiptView extends ConsumerWidget {
   final CompletedPayment payment;
-  final List<KitchenOrder> kots;
-  final List<CartItem> cartItems;
   final VoidCallback onDone;
 
   const _ReceiptView({
     required this.payment,
-    required this.kots,
-    required this.cartItems,
     required this.onDone,
   });
 
@@ -303,9 +297,9 @@ class _ReceiptView extends ConsumerWidget {
                   ),
                   child: _ReceiptPaper(
                     payment: payment,
-                    kots: kots,
-                    cartItems: cartItems,
                     restaurantName: settings.restaurantName,
+                    restaurantAddress: settings.restaurantAddress,
+                    restaurantPhone: settings.restaurantPhone,
                     receiptFooter: settings.receiptFooter,
                   ),
                 ),
@@ -371,16 +365,16 @@ class _ReceiptView extends ConsumerWidget {
 
 class _ReceiptPaper extends StatelessWidget {
   final CompletedPayment payment;
-  final List<KitchenOrder> kots;
-  final List<CartItem> cartItems;
   final String restaurantName;
+  final String restaurantAddress;
+  final String restaurantPhone;
   final String receiptFooter;
 
   const _ReceiptPaper({
     required this.payment,
-    required this.kots,
-    required this.cartItems,
     required this.restaurantName,
+    required this.restaurantAddress,
+    required this.restaurantPhone,
     required this.receiptFooter,
   });
 
@@ -398,11 +392,13 @@ class _ReceiptPaper extends StatelessWidget {
   Widget build(BuildContext context) {
     final d = payment.timestamp;
     final date =
-        '${d.day.toString().padLeft(2,'0')}/${d.month.toString().padLeft(2,'0')}/${d.year}';
+        '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
     final time =
-        '${d.hour.toString().padLeft(2,'0')}:${d.minute.toString().padLeft(2,'0')}';
+        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
     final invoiceNum =
-        'INV-${d.year}${d.month.toString().padLeft(2,'0')}${d.day.toString().padLeft(2,'0')}-${payment.id.substring(payment.id.length - 4)}';
+        'INV-${d.year}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}-${payment.id.substring(payment.id.length - 4)}';
+
+    final isDineIn = payment.orderType == 'Dine-In' && payment.tableNumber > 0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -410,10 +406,7 @@ class _ReceiptPaper extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Header
-          const Center(
-            child: Text('🏪',
-                style: TextStyle(fontSize: 36)),
-          ),
+          const Center(child: Text('🏪', style: TextStyle(fontSize: 36))),
           const SizedBox(height: 6),
           Center(
             child: Text(restaurantName,
@@ -422,49 +415,81 @@ class _ReceiptPaper extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     color: Colors.black87)),
           ),
-          const Center(
-            child: Text('POS Receipt',
-                style: TextStyle(fontSize: 11, color: Colors.black45)),
-          ),
-          const SizedBox(height: 12),
+          if (restaurantAddress.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Center(
+              child: Text(restaurantAddress,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 11, color: Colors.black45)),
+            ),
+          ],
+          if (restaurantPhone.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Center(
+              child: Text(restaurantPhone,
+                  style: const TextStyle(fontSize: 11, color: Colors.black45)),
+            ),
+          ],
+          const SizedBox(height: 10),
+          // Order info
           Center(
-            child: Text('Table ${payment.tableNumber}',
-                style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87)),
+            child: Text(
+              isDineIn ? 'Table ${payment.tableNumber}' : payment.orderType,
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87),
+            ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
+          Center(
+            child: Text('Order #${payment.orderNumber}',
+                style: const TextStyle(fontSize: 11, color: Colors.black54)),
+          ),
+          const SizedBox(height: 2),
           Center(
             child: Text(invoiceNum,
-                style: const TextStyle(
-                    fontSize: 11, color: Colors.black45)),
+                style: const TextStyle(fontSize: 11, color: Colors.black45)),
           ),
           Center(
             child: Text('$date   $time',
-                style: const TextStyle(
-                    fontSize: 11, color: Colors.black45)),
+                style: const TextStyle(fontSize: 11, color: Colors.black45)),
+          ),
+          const SizedBox(height: 2),
+          Center(
+            child: Text('Served by: ${payment.staffName}',
+                style: const TextStyle(fontSize: 11, color: Colors.black45)),
           ),
           const SizedBox(height: 14),
           _Dashes(),
           const SizedBox(height: 8),
-          // Items from KOTs
-          for (final kot in kots)
-            for (final item in kot.items)
-              _ReceiptItemRow(
-                  name: item.name,
-                  qty: item.quantity,
-                  price: item.subtotal,
-                  fmt: _fmt),
-          // Unsent cart items
-          for (final ci in cartItems)
+          // Items from payment snapshot
+          for (final item in payment.items) ...[
             _ReceiptItemRow(
-                name: ci.item.name,
-                qty: ci.quantity,
-                price: ci.subtotal,
+                name: item.modifiersLabel.isNotEmpty
+                    ? '${item.name} (${item.modifiersLabel})'
+                    : item.name,
+                qty: item.quantity,
+                price: item.subtotal,
                 fmt: _fmt),
+          ],
           const SizedBox(height: 8),
           _Dashes(),
+          const SizedBox(height: 8),
+          // Subtotal / discount / tax breakdown
+          _ReceiptRow('Subtotal', 'IQD ${_fmt(payment.subtotal)}'),
+          if (payment.discountAmount > 0) ...[
+            const SizedBox(height: 3),
+            _ReceiptRow('Discount', '- IQD ${_fmt(payment.discountAmount)}'),
+          ],
+          if (payment.tax > 0) ...[
+            const SizedBox(height: 3),
+            _ReceiptRow('Tax', 'IQD ${_fmt(payment.tax)}'),
+          ],
+          if (payment.tip > 0) ...[
+            const SizedBox(height: 3),
+            _ReceiptRow('Tip', 'IQD ${_fmt(payment.tip)}'),
+          ],
           const SizedBox(height: 8),
           // Total
           Row(
@@ -485,13 +510,9 @@ class _ReceiptPaper extends StatelessWidget {
           const SizedBox(height: 8),
           _Dashes(),
           const SizedBox(height: 8),
-          // Payment details
+          // Payment method
           _ReceiptRow('Payment',
               payment.method == PaymentMethod.cash ? 'Cash' : 'Card'),
-          if (payment.tip > 0) ...[
-            const SizedBox(height: 3),
-            _ReceiptRow('Tip', 'IQD ${_fmt(payment.tip)}'),
-          ],
           if (payment.method == PaymentMethod.cash) ...[
             const SizedBox(height: 3),
             _ReceiptRow('Received', 'IQD ${_fmt(payment.cashPaid)}'),
@@ -506,9 +527,7 @@ class _ReceiptPaper extends StatelessWidget {
           Center(
             child: Text(receiptFooter,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontSize: 11,
-                    color: Colors.black45)),
+                style: const TextStyle(fontSize: 11, color: Colors.black45)),
           ),
           const SizedBox(height: 8),
         ],
