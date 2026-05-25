@@ -12,6 +12,7 @@ import 'package:easycasher/features/orders/screens/orders_screen.dart';
 import 'package:easycasher/features/delivery/screens/delivery_screen.dart';
 import 'package:easycasher/features/delivery/screens/delivery_apps_screen.dart';
 import 'package:easycasher/features/menu/screens/menu_screen.dart';
+import 'package:easycasher/features/reports/screens/reports_screen.dart';
 import 'package:easycasher/features/settings/screens/settings_screen.dart';
 import 'package:easycasher/features/tables/providers/tables_provider.dart';
 import 'package:easycasher/features/tables/screens/tables_screen.dart';
@@ -31,8 +32,9 @@ class CashierScreen extends ConsumerWidget {
     final showTalabat  = appView == AppView.talabat;
     final showSettings = appView == AppView.settings;
     final showMenu     = appView == AppView.menu;
+    final showReports  = appView == AppView.reports;
     final showTablesMap =
-        !showKds && !showOrders && !showDelivery && !showTalabat && !showSettings && !showMenu &&
+        !showKds && !showOrders && !showDelivery && !showTalabat && !showSettings && !showMenu && !showReports &&
         orderType == OrderType.dineIn && activeTable == null;
 
     return Scaffold(
@@ -51,7 +53,9 @@ class CashierScreen extends ConsumerWidget {
                             ? const DeliveryAppsScreen()
                             : showSettings
                                 ? const SettingsScreen()
-                                : showMenu
+                                : showReports
+                                    ? const ReportsScreen()
+                                    : showMenu
                                     ? const MenuScreen()
                                     : Column(
                                     children: [

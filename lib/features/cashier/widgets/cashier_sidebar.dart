@@ -28,9 +28,10 @@ class CashierSidebar extends ConsumerWidget {
     final showDeliveryScr = permissions.contains(AppPermission.deliveryScreen);
     final showSettings    = permissions.contains(AppPermission.settings);
     final showMenu        = permissions.contains(AppPermission.menuManagement);
+    final showReports     = permissions.contains(AppPermission.reports);
 
     final hasOrderTypes = showTables || showTakeout || showDelivery || showDeliveryApp;
-    final hasScreens    = showOrders || showKds || showTalabat || showDeliveryScr || showSettings || showMenu;
+    final hasScreens    = showOrders || showKds || showTalabat || showDeliveryScr || showSettings || showMenu || showReports;
 
     return Container(
       width: 220,
@@ -164,6 +165,14 @@ class CashierSidebar extends ConsumerWidget {
                 label: 'Menu',
                 badge: 0,
                 view: AppView.menu,
+                selected: appView,
+              ),
+            if (showReports)
+              _ViewNavItem(
+                icon: Icons.bar_chart_rounded,
+                label: 'Reports',
+                badge: 0,
+                view: AppView.reports,
                 selected: appView,
               ),
             if (showSettings)

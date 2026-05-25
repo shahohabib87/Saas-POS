@@ -12,6 +12,7 @@ enum AppPermission {
   settings,
   menuManagement,
   tableManagement,
+  reports,
 }
 
 extension AppPermissionX on AppPermission {
@@ -27,6 +28,7 @@ extension AppPermissionX on AppPermission {
         AppPermission.settings        => 'Settings',
         AppPermission.menuManagement  => 'Menu Management',
         AppPermission.tableManagement => 'Table Management',
+        AppPermission.reports         => 'Reports',
       };
 
   String get description => switch (this) {
@@ -41,6 +43,7 @@ extension AppPermissionX on AppPermission {
         AppPermission.settings       => 'Access app settings',
         AppPermission.menuManagement  => 'Add, edit, and delete menu items',
         AppPermission.tableManagement => 'Add, edit, and delete tables',
+        AppPermission.reports         => 'View sales reports and analytics',
       };
 }
 
@@ -57,6 +60,7 @@ const kDefaultRolePermissions = <StaffRole, Set<AppPermission>>{
     AppPermission.settings,
     AppPermission.menuManagement,
     AppPermission.tableManagement,
+    AppPermission.reports,
   },
   StaffRole.manager: {
     AppPermission.tables,
@@ -70,6 +74,7 @@ const kDefaultRolePermissions = <StaffRole, Set<AppPermission>>{
     AppPermission.settings,
     AppPermission.menuManagement,
     AppPermission.tableManagement,
+    AppPermission.reports,
   },
   StaffRole.cashier: {
     AppPermission.tables,

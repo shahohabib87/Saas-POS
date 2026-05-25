@@ -4,7 +4,7 @@ import 'package:easycasher/core/database/database_provider.dart';
 
 enum OrderType { dineIn, takeaway, delivery, deliveryApp }
 
-enum AppView { pos, orders, kds, delivery, talabat, settings, menu }
+enum AppView { pos, orders, kds, delivery, talabat, settings, menu, reports }
 
 final orderTypeProvider =
     StateProvider<OrderType>((ref) => OrderType.dineIn);
