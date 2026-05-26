@@ -1,50 +1,70 @@
 ---
 name: project-overview
-description: "EasyCasher — Flutter POS system with delivery, kitchen display, cashier, and reporting features"
+description: "EasyCasher Flutter POS app — architecture, features built, and current state"
 metadata: 
   node_type: memory
   type: project
-  originSessionId: 02ddbef3-f0ab-4f03-8a9b-ddd3bc451b26
+  originSessionId: 6caad047-0606-48d4-90fc-f50ba0cc1abc
 ---
 
-EasyCasher is a Flutter POS (Point of Sale) application targeting restaurant/food-service businesses. It supports Kurdish, Arabic, and English (multi-language from the start). The app name and package are `easycasher`.
+## App: EasyCasher POS
+Flutter + Riverpod + Drift (SQLite) restaurant POS system.
 
-**Why:** Built as a full-featured POS supporting offline-first use with a local SQLite database (Drift ORM), real-time order updates via WebSocket (KDS/kitchen display), and receipt printing.
+**GitHub:** github.com/shahohabib87/easycasher (private, branch: master)
 
-**How to apply:** Treat this as a production Flutter app — feature flags, platform targets (Android, iOS, Windows), localization, and offline resilience all matter. Avoid web-only assumptions.
+## Architecture
+- `lib/core/database/app_database.dart` — Drift SQLite DB, all tables and queries
+- `lib/core/database/database_provider.dart` — Riverpod `appDatabaseProvider`
+- Features are organized under `lib/features/<feature>/`
 
-## Tech stack
-- Flutter (Dart SDK ^3.11.5)
-- State management: Riverpod (flutter_riverpod ^2.6.1)
-- Navigation: go_router ^14.6.2
-- Networking: Dio ^5.7.0
-- Local DB (offline): Drift (SQLite) with drift_dev code generation
-- Real-time: web_socket_channel (KDS / live orders)
-- Local storage/settings: shared_preferences
-- Localization: intl + flutter_localizations (Kurdish, Arabic, English)
-- Charts: fl_chart (reports)
-- Printing/receipts: printing + pdf packages
-- UI: flutter_screenutil (responsive sizing), google_fonts
+## Database Tables (SQLite via Drift)
+- `categories`, `menu_items` — menu data
+- `staff_members` — staff with roles and PINs
+- `role_perms` — per-role permission toggles
+- `restaurant_tables` — table layout
+- `orders`, `order_items` — completed order history
+- `settings_kv` — key-value app settings
 
-## Feature modules (lib/features/)
-- auth
-- cashier
-- delivery
-- kitchen (KDS)
-- menu
-- orders
-- payment
-- reports
-- tables
+## Seeded Data (first launch only)
+Staff: Admin(9999), Ahmed/waiter(1234), Sara/cashier(5678), Kitchen(1111), Manager(0000)
+Categories: All, Burgers, Pizza, Drinks, Desserts, Sides
+Menu: 18 items with modifiers and IQD prices
+Tables: 20 tables with varying capacities
 
-## Folder structure
-Each feature follows: models / providers / screens / widgets
+## Features Built (as of 2026-05-25)
+- Login screen with PIN pad and staff roles
+- Cashier screen: menu grid, cart, modifiers, order types
+- Kitchen Display Screen (KDS) — 3-column layout
+- Payment screen: cash/card, tip, split, discount
+- Receipt screen — shows after payment (improved today)
+- Orders screen: Active and Completed tabs with detail dialog
+- Tables management: add/edit/delete, status tracking
+- Menu management: categories + products + modifiers (admin/manager)
+- Settings: restaurant info, tax, service mode, staff management
+- Dynamic role permissions system
+- Delivery screens (exist but minimal)
 
-## Other lib directories
-- lib/core/: constants, theme, utils
-- lib/routes/
-- lib/services/
-- lib/app/
+## Recent Commits
+- a9f3864 — Add Reports screen with sales analytics for admin/manager
+- e7d85c6 — Improve receipt: fix order type, add subtotal/discount/tax, staff, address
+- f3d778f — Migrate all providers to SQLite via Drift database
+- 3e5c559 — Add permissions, menu management, dynamic tables, and order history
+- c2f5879 — Add payment screen, settings, order types, IQD currency, KDS badges
+- 0474534 — Add orders screen, KDS 3-column layout, void item, kitchen status chip
+- 023dea8 — Initial commit - EasyCasher POS v0.1
 
-## Platforms
-Android, iOS, Windows (build directories present)
+## Target Architecture (Foodics model)
+- **POS App** — Flutter tablet app (existing, keep building)
+- **Backend API** — Laravel (PHP) hosted on Digital Ocean
+- **Database** — MySQL on Digital Ocean (replace local SQLite)
+- **Web Dashboard** — separate web app for owner/manager reports
+- **Plan:** Finish POS app first → then build Laravel API → migrate POS from SQLite to API → build web dashboard
+
+## Next Features to Build
+1. Complete POS app features (delivery screen — reports screen is done)
+2. Laravel + MySQL backend on Digital Ocean
+3. Migrate Flutter POS from SQLite to Laravel API
+4. Web dashboard for owner reports
+
+**Why:** User confirmed Laravel + MySQL + Digital Ocean multiple times. Do NOT ask again.
+**How to apply:** Always check this before suggesting next steps — build on what exists, don't duplicate.

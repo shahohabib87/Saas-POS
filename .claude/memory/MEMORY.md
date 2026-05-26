@@ -1,5 +1,6 @@
-# Memory Index
+# EasyCasher Memory Index
 
-- [Project Overview](project_overview.md) — EasyCasher Flutter POS app: Riverpod, Drift/SQLite, go_router, WebSocket KDS, multi-language (Kurdish/Arabic/English), Android+iOS+Windows
-- [Memory Preference](feedback_memory_preference.md) — User wants all conversation context saved comprehensively; err on the side of saving more
-- [Project Architecture](project_architecture.md) — Two service modes (Full Service/Quick Service), four roles (Waiter/Cashier/Kitchen/Manager), 7 build phases, matches Foodics structure
+- [User Profile](user_profile.md) — Restaurant POS developer, learning Git/Flutter, prefers step-by-step guidance
+- [Project Overview](project_overview.md) — EasyCasher Flutter POS app, current features and architecture
+- [Feedback & Preferences](feedback.md) — How the user likes to collaborate and communicate
+- [Next Topic: Inventory](next_topic_inventory.md) — Foodics-style product & inventory management to implement next
