@@ -11,7 +11,8 @@ metadata:
 - Use analogies for technical concepts (e.g. "staging = putting items in a shopping basket")
 - Always offer to run commands on behalf of the user ("want me to commit for you?")
 - When showing code locations, use clickable markdown links like [file.dart](path/to/file.dart#L42)
-- Ask before pushing to GitHub — user wants to control when things go public
+- Always commit and push memory files to GitHub after saving them — user wants memory synced across devices
+- Ask before pushing **code** to GitHub — user wants to control when code changes go public
 - Keep responses concise — user reads carefully, no need for long explanations
 - When user asks "what to do next", give 2-3 clear options ranked by priority
 
