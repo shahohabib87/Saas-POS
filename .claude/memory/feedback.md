@@ -17,7 +17,9 @@ metadata:
 - When user asks "what to do next", give 2-3 clear options ranked by priority
 
 - NEVER ask again about backend language or hosting — confirmed multiple times: **Laravel 12 + Digital Ocean droplet**. DB refined to **PostgreSQL + Redis** (2026-07-06). Adds Vue.js dashboard + Talabat/Careem + subscription billing. Architecture = **modular monolith, NOT microservices**.
-- NEVER ask again about POS vs web separation — user wants the Foodics model (separate web dashboard + POS app)
+- **DECISION CHANGED 2026-07-06: EVERYTHING IS WEB — NO Flutter app at all.** The Flutter POS in the Saas-POS repo is now ONLY a visual/feature reference, never to be built/wired. The POS itself becomes a **web app**.
+- **ONE Vue app with TWO areas** (confirmed 2026-07-06): (1) owner/manager **dashboard** — reports, menu, staff, subscription; (2) **POS/cashier** register screen. Shared login, one codebase. NOT two separate apps.
+- The web POS must still be **offline-first** (region has internet shutdowns) → build it as a **PWA** with local storage (IndexedDB) that syncs via the existing `POST /api/sync`. (Supersedes the earlier "separate Flutter POS app" plan.)
 
 **Why:** User is building a real product and learning dev tools simultaneously — needs guidance not just code.
 **How to apply:** Balance teaching with doing. Explain the why, not just the how.
