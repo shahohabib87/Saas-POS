@@ -46,5 +46,11 @@ The **POS part must keep working with NO internet** (internet shutdowns are comm
 - ✅ Step 1 DONE: Laravel scaffolded, Postgres+Redis wired, migrations run, HTTP 200, Redis ping OK.
 - ✅ Step 2 DONE: multi-tenancy + Sanctum auth. Verified end-to-end via curl (register 201, login, /me, 401 without token).
 - ✅ Step 3 (catalog) DONE 2026-07-06: ported Flutter menu to tenant-scoped, **sync-ready** models — `categories`, `menu_items` (jsonb modifier_groups + is_available), `restaurant_tables`. All use **UUID string PKs (HasUuids) + SoftDeletes + BelongsToTenant**. CRUD API: `apiResource` categories / menu-items / tables under auth:sanctum (index/store/update/destroy; store accepts optional client-supplied uuid `id` for offline creates). Seeder ports 5 categories, 18 items (with modifiers), 20 tables into Demo Restaurant. Tenant isolation PROVEN via curl (new tenant sees 0; creating 1 doesn't affect demo's 5).
-- ⏭️ Next: Step 3b **orders + order_items** (the offline-created/push-up data) + the **sync engine** (`POST /api/sync` batch push + pull-since-timestamp) — directly serves the offline-first requirement above. Then staff-management CRUD, Step 4 subscriptions, Vue dashboard, Talabat/Careem.
+- ✅ Step 3b (orders + SYNC ENGINE) DONE 2026-07-06: `orders` + `order_items` tables (UUID PKs, tenant-scoped; orders soft-delete; ported from Flutter CompletedPayment). Read API: `GET /api/orders` (with items, date filters), `GET /api/orders/{id}`. **`POST /api/sync`** (`SyncController`) = the offline-first core: PUSH offline orders via `updateOrCreate` on client UUID (IDEMPOTENT — retries never duplicate), wrapped in a DB transaction; PULL catalog changed since `last_synced_at` incl. soft-deleted tombstones (withTrashed). Response `server_time` = client's next checkpoint. Verified via curl: push 2 orders, re-push → still 2 (no dupes), pull-since returns only the 1 changed row.
+- ⏭️ Next: staff-management CRUD (users API) + POS PIN-login endpoint; Step 4 subscriptions (plans/trial gating middleware); then Vue dashboard; then Talabat/Careem; then wire the Flutter POS to this API + local Drift sync queue.
+
+## API surface so far (all under auth:sanctum except register/login)
+POST /register, POST /login, POST /logout, GET /me
+apiResource: /categories, /menu-items, /tables (index/store/update/destroy)
+GET /orders, GET /orders/{id}, POST /sync
 - Not a git repo yet / not pushed — ask user before pushing code (per [[feedback]]).
