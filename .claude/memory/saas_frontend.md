@@ -26,6 +26,8 @@ The EasyCasher frontend is **ONE Vue web app with two areas** (see [[feedback]] 
 - Backend: `cd /workspaces/easycasher-saas/api && php artisan serve --port=8000` (needs Docker pg+redis up; reseed with `php artisan migrate:fresh --seed --force` — resets the demo 14-day trial).
 - Frontend: `cd /workspaces/easycasher-saas/dashboard && npm run dev` (port 5173).
 - **Vite proxies `/api` → `http://127.0.0.1:8000`** (in `vite.config.ts`), so the browser hits one origin, no CORS.
+- **Codespace run gotcha:** `vite.config.ts` sets `server.allowedHosts: ['.app.github.dev','localhost']` or Vite blocks the forwarded domain. Forwarded URL = `https://$CODESPACE_NAME-5173.app.github.dev`. Only port 5173 needs forwarding (proxy reaches api server-side). To restart Vite, DON'T `pkill -f vite` (matches the shell cmd → kills it); kill by port: `ss -ltnp | grep :5173`.
+- **Demoed live 2026-07-06 — user approved the UI ("looks nice").**
 - Build/typecheck: `npm run build` (runs `vue-tsc -b && vite build`).
 
 ## Verified (2026-07-06)
