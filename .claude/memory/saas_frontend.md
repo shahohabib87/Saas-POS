@@ -78,7 +78,13 @@ The EasyCasher frontend is **ONE Vue web app with two areas** (see [[feedback]] 
 - ✅ Verified: build clean; cart math unit-tested via Pinia+tsx (exclusive 15%, discount, tip, inclusive mode, clear-reset all correct); full split order w/ tax+discount+tip pushed to /orders correctly (after fixing the [[saas-backend]] empty-modifiers_label sync bug).
 - ⚠️ Deferred in #1: service_charge (no order column), receipt (that's polish #2). Tax rounding = `Math.round`.
 
+## Step F6 — receipt (DONE 2026-07-06) — polish item #2
+- `components/pos/ReceiptDialog.vue` — 80mm thermal-style receipt (monospace, dashed dividers): header (tenant name/address/phone from `auth.tenant.settings`), order # + type + date (`toLocaleString en-GB`) + staff, line items (`qty× name` + line total, modifiers under), totals (subtotal/discount/tax/tip/**TOTAL**), payment (method + cash/card/change), "Thank you". Shows "(saved offline — will sync)" when `offline` prop true. Buttons: "New order" (close) + "🖨️ Print" (`window.print()`).
+- `style.css` — global `@media print` block: hide everything (`body *` visibility hidden), show only `.receipt-print`; neutralize `.receipt-overlay` (static, no backdrop); hide `.receipt-actions`. So printing yields just the receipt at 80mm.
+- `PosView.vue` — after `offline.submitOrder`, instead of a toast, sets `receiptOrder`/`receiptOffline` → shows `ReceiptDialog`; closing it (`receiptOrder=null`) starts the next order. Cart already cleared.
+- ✅ Build clean. Visual/print component — best confirmed in browser (reuses order data proven in #1 + cached tenant settings; works offline since all data is local).
+
 ## Next
-- ⏭️ Later polish (no strict order): #2 receipt print, #3 orders screen (active/completed/void), #4 KDS, #5 reports, #6 tables/dine-in. (was: tax/discount settings — now DONE as #1) (needs a tenant-settings endpoint on backend + wire into cart `total`); receipt print (`window.print` or backend PDF); dine-in tables flow (tables API exists); incremental catalog pull via `/sync` PULL + `last_synced_at` (currently full GET each online load); real PWA icons.
+- ⏭️ Later polish: #3 orders screen (active/completed list + details + void w/ manager PIN), #4 KDS, #5 reports, #6 tables/dine-in. (#1 settings+tax, #2 receipt — DONE) (needs a tenant-settings endpoint on backend + wire into cart `total`); receipt print (`window.print` or backend PDF); dine-in tables flow (tables API exists); incremental catalog pull via `/sync` PULL + `last_synced_at` (currently full GET each online load); real PWA icons.
 - Also revisit: `/sync` sits behind the `subscribed` 402 gate → a lapsed tenant's queued offline orders won't push until they renew (they stay safely queued). See [[saas-backend]] grace-period note.
 - **Pushed to GitHub 2026-07-06:** part of the private monorepo **github.com/shahohabib87/easycasher-saas** (branch `main`) alongside `api/` — see [[saas-backend]]. Ask before pushing NEW code (per [[feedback]]).
