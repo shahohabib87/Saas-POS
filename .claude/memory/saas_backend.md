@@ -60,4 +60,4 @@ POST /logout, GET /me, GET /subscription, POST /subscribe  (auth, NOT subscripti
 --- below require active trial/subscription (402 if lapsed) ---
 apiResource: /categories, /menu-items, /tables, /staff (index/store/update/destroy)
 GET /orders, GET /orders/{id}, POST /sync
-- Not a git repo yet / not pushed — ask user before pushing code (per [[feedback]]).
+- **Now on GitHub (2026-07-06):** `api/` + `dashboard/` live in ONE private monorepo **github.com/shahohabib87/easycasher-saas** (default branch `main`). `.env`/`vendor`/`node_modules` all gitignored (verified no secrets committed). Repo created via `gh` after `gh auth login` browser flow (Codespace default GITHUB_TOKEN can't create repos). Still ask before pushing NEW code (per [[feedback]]).

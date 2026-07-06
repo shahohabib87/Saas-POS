@@ -71,4 +71,4 @@ The EasyCasher frontend is **ONE Vue web app with two areas** (see [[feedback]] 
 ## Next
 - ⏭️ Later polish (no strict order): tax/discount settings (needs a tenant-settings endpoint on backend + wire into cart `total`); receipt print (`window.print` or backend PDF); dine-in tables flow (tables API exists); incremental catalog pull via `/sync` PULL + `last_synced_at` (currently full GET each online load); real PWA icons.
 - Also revisit: `/sync` sits behind the `subscribed` 402 gate → a lapsed tenant's queued offline orders won't push until they renew (they stay safely queued). See [[saas-backend]] grace-period note.
-- Neither api/ nor dashboard/ is a git repo yet / pushed — ask user before pushing code (per [[feedback]]).
+- **Pushed to GitHub 2026-07-06:** part of the private monorepo **github.com/shahohabib87/easycasher-saas** (branch `main`) alongside `api/` — see [[saas-backend]]. Ask before pushing NEW code (per [[feedback]]).
