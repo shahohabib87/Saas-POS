@@ -8,6 +8,14 @@ metadata:
 
 The online SaaS build lives in a SEPARATE folder from the Flutter repo. Flutter app ([[project-overview]]) is the reference/spec only. Started 2026-07-06 from scratch.
 
+## CRITICAL REQUIREMENT — offline-first POS + sync (user, 2026-07-06)
+The **POS part must keep working with NO internet** (internet shutdowns are common in the target region). When connection returns, it must **sync** local data up/down automatically. This shapes the whole design:
+- **Client-generated UUID primary keys** on all POS-created data (orders, order items) so offline inserts never collide across devices → server accepts client-supplied ids.
+- Every synced table carries `updated_at` (and ideally a `deleted_at`/soft-delete + `version`) for conflict resolution (last-write-wins baseline; orders are append-only so trivial to sync).
+- Catalog (categories, menu, tables) = server-authoritative → POS pulls it down and caches locally (Flutter Drift/SQLite already does this).
+- Orders/payments = created offline on POS → queued locally → pushed up on reconnect. Never block a sale on the network.
+- Plan a `POST /api/sync` (batch push + pull-since-timestamp) endpoint later. Design models sync-friendly NOW.
+
 ## Location
 - **Laravel API:** `/workspaces/easycasher-saas/api`  (NOT inside the Flutter Saas-POS repo)
 - Planned sibling: `/workspaces/easycasher-saas/dashboard` (Vue.js, not created yet)
@@ -37,5 +45,6 @@ The online SaaS build lives in a SEPARATE folder from the Flutter repo. Flutter 
 ## Status (2026-07-06)
 - ✅ Step 1 DONE: Laravel scaffolded, Postgres+Redis wired, migrations run, HTTP 200, Redis ping OK.
 - ✅ Step 2 DONE: multi-tenancy + Sanctum auth. Verified end-to-end via curl (register 201, login, /me, 401 without token).
-- ⏭️ Next: Step 3 port Flutter models (categories, menu_items, tables, orders/order_items, staff mgmt) as tenant-scoped models + CRUD API using BelongsToTenant; Step 4 subscriptions; then Vue dashboard; then Talabat/Careem.
+- ✅ Step 3 (catalog) DONE 2026-07-06: ported Flutter menu to tenant-scoped, **sync-ready** models — `categories`, `menu_items` (jsonb modifier_groups + is_available), `restaurant_tables`. All use **UUID string PKs (HasUuids) + SoftDeletes + BelongsToTenant**. CRUD API: `apiResource` categories / menu-items / tables under auth:sanctum (index/store/update/destroy; store accepts optional client-supplied uuid `id` for offline creates). Seeder ports 5 categories, 18 items (with modifiers), 20 tables into Demo Restaurant. Tenant isolation PROVEN via curl (new tenant sees 0; creating 1 doesn't affect demo's 5).
+- ⏭️ Next: Step 3b **orders + order_items** (the offline-created/push-up data) + the **sync engine** (`POST /api/sync` batch push + pull-since-timestamp) — directly serves the offline-first requirement above. Then staff-management CRUD, Step 4 subscriptions, Vue dashboard, Talabat/Careem.
 - Not a git repo yet / not pushed — ask user before pushing code (per [[feedback]]).
