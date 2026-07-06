@@ -5,3 +5,4 @@
 - [Feedback & Preferences](feedback.md) — How the user likes to collaborate and communicate
 - [Next Topic: Inventory](next_topic_inventory.md) — Foodics-style product & inventory management to implement next
 - [SaaS Backend](saas_backend.md) — Laravel 13 online SaaS API at /workspaces/easycasher-saas/api (Postgres+Redis, separate from Flutter repo)
+- [SaaS Frontend](saas_frontend.md) — ONE Vue app (dashboard + POS) at /workspaces/easycasher-saas/dashboard — web-only, no Flutter
