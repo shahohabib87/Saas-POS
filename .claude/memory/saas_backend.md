@@ -23,7 +23,19 @@ The online SaaS build lives in a SEPARATE folder from the Flutter repo. Flutter 
 - **IMPORTANT gotcha:** the Codespace PHP 8.4 is a custom source build at `/home/codespace/.php/current` WITHOUT pgsql. We compiled `pdo_pgsql.so` from PHP 8.4.15 source and enabled it via `/usr/local/php/8.4.15/ini/conf.d/20-pdo_pgsql.ini`. If PHP is rebuilt/reset, this must be redone (download php-8.4.15 source, `cd ext/pdo_pgsql`, phpize, configure --with-pdo-pgsql, make, copy .so to `/usr/local/php/8.4.15/extensions/`).
 - Run server: `cd /workspaces/easycasher-saas/api && php artisan serve` → boots HTTP 200.
 
+## Multi-tenancy design (Step 2 — DONE 2026-07-06)
+- Model = **single-database, row-level tenancy**. `tenants` table = one restaurant business (the SaaS customer). Every business table carries `tenant_id`.
+- `users` extended: `tenant_id` (FK), `role` (admin|manager|cashier|kitchen|waiter), `pin` (4-digit POS login, unique per tenant), email/password now nullable (staff may use PIN only). `pin`+`password` are in `$hidden`.
+- **Auth = Laravel Sanctum** API tokens. Endpoints in `routes/api.php`:
+  - `POST /api/register` — creates tenant + owner(admin), 14-day trial, returns token
+  - `POST /api/login` — email+password → token
+  - `POST /api/logout` (auth) — revokes current token
+  - `GET /api/me` (auth) — current user + tenant
+- Reusable **`BelongsToTenant` trait** (`app/Models/Concerns/`) + **`TenantScope`** (`app/Models/Scopes/`) auto-filter reads and auto-fill `tenant_id` on writes. Apply to business models in Step 3. NOT applied to User (avoids Sanctum auth-resolution recursion).
+- Demo seed: tenant "Demo Restaurant"; owner **owner@demo.test / password** (pin 9999); staff Ahmed/waiter(1234), Sara/cashier(5678), Kitchen(1111), Manager(0000).
+
 ## Status (2026-07-06)
 - ✅ Step 1 DONE: Laravel scaffolded, Postgres+Redis wired, migrations run, HTTP 200, Redis ping OK.
-- ⏭️ Next: Step 2 multi-tenancy + auth (Sanctum); Step 3 port Flutter models (menu/orders/tables/staff); Step 4 subscriptions; then Vue dashboard; then Talabat/Careem.
+- ✅ Step 2 DONE: multi-tenancy + Sanctum auth. Verified end-to-end via curl (register 201, login, /me, 401 without token).
+- ⏭️ Next: Step 3 port Flutter models (categories, menu_items, tables, orders/order_items, staff mgmt) as tenant-scoped models + CRUD API using BelongsToTenant; Step 4 subscriptions; then Vue dashboard; then Talabat/Careem.
 - Not a git repo yet / not pushed — ask user before pushing code (per [[feedback]]).
