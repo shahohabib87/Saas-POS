@@ -98,6 +98,11 @@ The EasyCasher frontend is **ONE Vue web app with two areas** (see [[feedback]] 
 - ⚠️ Deferred: real-time via Redis/websockets (currently 5s poll); role-based routing (any logged-in user can open KDS/POS); offline KDS.
 
 ## Next
-- ⏭️ Later polish: #5 reports (sales analytics — by day/item/payment), #6 tables/dine-in flow. (#1 settings+tax, #2 receipt, #3 orders+void, #4 KDS — DONE) (needs a tenant-settings endpoint on backend + wire into cart `total`); receipt print (`window.print` or backend PDF); dine-in tables flow (tables API exists); incremental catalog pull via `/sync` PULL + `last_synced_at` (currently full GET each online load); real PWA icons.
+- ⏭️ Later polish: #5 reports (sales analytics — by day/item/payment), #6 tables/dine-in flow. (#1 settings+tax, #2 receipt, #3 orders+void, #4 KDS — DONE)
+
+## ⏸️ SESSION PAUSED 2026-07-06 (resume tomorrow)
+- **RESUME AT: polish #5 — Reports** (sales analytics: totals by day, top items, payment-method breakdown; dashboard already has basic stat cards to build on).
+- **⚠️ PENDING PUSH:** commits `28716a7` (#3 orders+void) + `27909b3` (#4 KDS) are committed locally in easycasher-saas but NOT yet pushed to GitHub. First thing next session: remind user to run `unset GITHUB_TOKEN && gh auth setup-git && git push` in their terminal (see [[saas-backend]] push gotcha). Everything through #2 (receipt, 7b9027e) IS pushed.
+- Dev servers were shut down at end of session. To restart: pg+redis `docker start easycasher-pg easycasher-redis`; api `cd /workspaces/easycasher-saas/api && php artisan serve --host 0.0.0.0 --port=8000`; frontend `cd /workspaces/easycasher-saas/dashboard && npm run dev -- --port 5173`. Reseed if needed: `php artisan migrate:fresh --seed --force` (resets 14-day trial + demo data w/ 15% tax). (needs a tenant-settings endpoint on backend + wire into cart `total`); receipt print (`window.print` or backend PDF); dine-in tables flow (tables API exists); incremental catalog pull via `/sync` PULL + `last_synced_at` (currently full GET each online load); real PWA icons.
 - Also revisit: `/sync` sits behind the `subscribed` 402 gate → a lapsed tenant's queued offline orders won't push until they renew (they stay safely queued). See [[saas-backend]] grace-period note.
 - **Pushed to GitHub 2026-07-06:** part of the private monorepo **github.com/shahohabib87/easycasher-saas** (branch `main`) alongside `api/` — see [[saas-backend]]. Ask before pushing NEW code (per [[feedback]]).
