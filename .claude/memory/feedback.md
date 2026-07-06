@@ -16,7 +16,7 @@ metadata:
 - Keep responses concise — user reads carefully, no need for long explanations
 - When user asks "what to do next", give 2-3 clear options ranked by priority
 
-- NEVER ask again about backend language or hosting — user has confirmed multiple times: **Laravel + MySQL + Digital Ocean**
+- NEVER ask again about backend language or hosting — confirmed multiple times: **Laravel 12 + Digital Ocean droplet**. DB refined to **PostgreSQL + Redis** (2026-07-06). Adds Vue.js dashboard + Talabat/Careem + subscription billing. Architecture = **modular monolith, NOT microservices**.
 - NEVER ask again about POS vs web separation — user wants the Foodics model (separate web dashboard + POS app)
 
 **Why:** User is building a real product and learning dev tools simultaneously — needs guidance not just code.

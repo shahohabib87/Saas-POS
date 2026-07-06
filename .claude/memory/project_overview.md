@@ -53,18 +53,22 @@ Tables: 20 tables with varying capacities
 - 0474534 — Add orders screen, KDS 3-column layout, void item, kitchen status chip
 - 023dea8 — Initial commit - EasyCasher POS v0.1
 
-## Target Architecture (Foodics model)
-- **POS App** — Flutter tablet app (existing, keep building)
-- **Backend API** — Laravel (PHP) hosted on Digital Ocean
-- **Database** — MySQL on Digital Ocean (replace local SQLite)
-- **Web Dashboard** — separate web app for owner/manager reports
-- **Plan:** Finish POS app first → then build Laravel API → migrate POS from SQLite to API → build web dashboard
+## Target Architecture (Foodics model) — refined 2026-07-06
+- **POS App** — Flutter tablet app (existing) — now used as the reference/spec for the online build
+- **Backend API** — **Laravel 12** (PHP) on a **Digital Ocean droplet** (we set the droplet up together; live details NOT yet captured in memory — capture IP + installed services)
+- **Database** — **PostgreSQL** (upgraded from the earlier MySQL plan)
+- **Cache/Queue/Realtime** — **Redis** (caching, queue workers, KDS broadcasting)
+- **Web Dashboard** — **Vue.js** app for owner/manager reports + subscription management
+- **Delivery integrations** — **Talabat, Careem** via Laravel queued jobs/webhooks (NOT separate microservices)
+- **Payments + Subscriptions** — SaaS subscription billing (provider TBD; regional constraints matter)
+- **Architecture style** — **modular monolith** in Laravel (modules: tenancy, menu, orders, billing, delivery); extract to services later only where scale demands. User floated "microservices"; recommended modular monolith + queue workers instead.
+- **Goal** — fully online multi-tenant SaaS (everything online), separate from the Flutter project
 
 ## Next Features to Build
-1. Complete POS app features (delivery screen — reports screen is done)
-2. Laravel + MySQL backend on Digital Ocean
-3. Migrate Flutter POS from SQLite to Laravel API
-4. Web dashboard for owner reports
+1. Capture DO droplet live state (IP, PHP/Nginx/Postgres/Redis installed?, any Laravel app deployed)
+2. Scaffold Laravel 12 API — multi-tenant + auth (Sanctum) + first module (menu/orders from Flutter models)
+3. Vue.js web dashboard (reports + subscription management)
+4. Talabat/Careem + payment/subscription integrations
 
-**Why:** User confirmed Laravel + MySQL + Digital Ocean multiple times. Do NOT ask again.
+**Why:** User confirmed Laravel + Digital Ocean multiple times; refined DB to PostgreSQL + Redis and added Vue dashboard + delivery/payment integrations on 2026-07-06. Do NOT re-ask backend/hosting/POS-vs-web questions.
 **How to apply:** Always check this before suggesting next steps — build on what exists, don't duplicate.
