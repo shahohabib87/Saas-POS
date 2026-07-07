@@ -7,3 +7,4 @@
 - [SaaS Backend](saas_backend.md) — Laravel 13 online SaaS API at /workspaces/easycasher-saas/api (Postgres+Redis, separate from Flutter repo)
 - [SaaS Frontend](saas_frontend.md) — ONE Vue app (dashboard + POS) at /workspaces/easycasher-saas/dashboard — web-only, no Flutter
 - [SaaS Super Admin](saas_superadmin.md) — platform console above all tenants (superadmin@easycasher.test)
+- [SaaS Deployment](saas_deployment.md) — deploying to DO droplet (CWP/CentOS, NOT Ubuntu; existing easycasher-relay project) — resume tomorrow
