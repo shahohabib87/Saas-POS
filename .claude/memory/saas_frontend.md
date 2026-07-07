@@ -113,6 +113,20 @@ The EasyCasher frontend is **ONE Vue web app with two areas** (see [[feedback]] 
 
 ## 🎉 ALL 6 POLISH ITEMS DONE (2026-07-07): #1 settings+tax, #2 receipt, #3 orders+void, #4 KDS, #5 reports, #6 tables/dine-in.
 
+## Step F11 — PIN-pad login + role-based access (DONE 2026-07-07) — closes the biggest Flutter-parity gap
+- No backend change — reused existing `POST /pin-login` (`{tenant_slug, pin}` → token+user+tenant).
+- `stores/auth.ts`: `pinLogin(pin)` uses device-remembered slug; `setSession` saves `tenant.slug` to localStorage `easycasher.tenantSlug` (**survives logout** so the PIN pad stays available); `logout` keeps the slug; `forgetDevice()` clears it; getters `role`, `deviceTenantSlug`.
+- `lib/roles.ts`: `ROLE_HOME` (admin/manager→'/', cashier→/pos, kitchen→/kds, waiter→/tables), `ROLE_ROUTES` (cashier:[pos,orders,tables], kitchen:[kds], waiter:[tables,pos]; admin/manager=all), `canAccess(role,routeName)`, `homeFor(role)`, `isManagerRole`.
+- `components/PinPad.vue` — 4-dot numeric pad, auto-submits at 4 digits (clears itself for retry).
+- `views/LoginView.vue` — dual mode: **PIN pad** (default when device knows its restaurant) + **owner email**. Post-login → `homeFor(role)`. Demo PIN hints shown.
+- `router/index.ts` guard: adds role check — logged-in user hitting a route `!canAccess` → redirected to `homeFor(role)`; login redirect also role-aware.
+- `layouts/AppLayout.vue` — sidebar nav + Open POS/KDS links filtered by `canAccess` (waiter landing on /tables sees only their links).
+- `PosView.vue`/`KdsView.vue` — top-left button role-aware: managers "← Dashboard", staff "Log out".
+- ✅ Verified: build clean; `lib/roles` unit-tested via tsx (14 assertions — homes + allow/block matrix); `pin-login` returns correct roles (5678 cashier, 1111 kitchen, 0000 manager). Full flow: tap PIN → land on role home → blocked elsewhere.
+- ⚠️ Deferred: per-permission toggles UI (Flutter's dynamic permissions #3 — role gating is coarse-grained for now); role gating is client-side UX (backend endpoints still enforce their own rules e.g. manager-only settings/void/staff).
+
+## Remaining from Flutter POS (audit 2026-07-07): PIN login+RBAC ✅ now done. Left: dynamic per-permission toggles; delivery screens (was "minimal" in Flutter); service-mode auto-switch (quick vs full flow). NOT-from-Flutter ideas: inventory/ingredients, Talabat/Careem, super admin, DO deployment.
+
 ## Next (ideas — no active task)
 - Deploy to the Digital Ocean droplet (make it live online, not just Codespace) — see [[saas-backend]] for droplet plan.
 - Super admin / platform console (oversee all tenants) — user asked about it 2026-07-06; not built.
