@@ -27,6 +27,12 @@ User asked to "make 100% like Flutter POS". Audited Flutter feature-by-feature (
 - ✅ Verified via curl: 2-KOT order → KDS shows 2 tickets; bump KOT#1; per-item void (cashier 403, manager voids Fries → total 15000→11000, ticket updates); quick-service completed order w/ 1 KOT appears on KDS; transfer→table 9; order show returns kots(2)+items(3).
 - ⚠️ Minor remaining deviations only: staff avatar (login uses role emoji); settings single-scroll vs Flutter's 7-section left-nav (cosmetic). **Everything functional in Flutter is now matched.**
 
+## Step F15 — SUPPLIERS + PURCHASING (BEYOND Flutter, 2026-07-07, commit `4599ff4`)
+- Neither Flutter NOR the web had suppliers (Foodics procurement feature; user asked). Built on top of inventory.
+- Backend: `suppliers` table + CRUD (`SupplierController` apiResource); `ingredients` gained `supplier_id` + `cost`; `purchases` table (supplier_id, reference, note, total, items jsonb, received_at) + `PurchaseController` (index + **store = "receive delivery"** → adds each line's qty to ingredient stock in a txn, computes total, records purchase). Routes under subscribed group.
+- Frontend: `types.ts` Supplier+Purchase; `api/suppliers.ts` (supplierApi + purchaseApi.receive); `views/SuppliersView.vue` (route `/suppliers`, sidebar 🚚, gated by the **`inventory` permission** — reused, no new perm) — supplier CRUD table + **Receive delivery** modal (pick supplier + ref + ingredient lines qty/cost → restocks) + recent-deliveries history. InventoryView ingredient editor gained **Supplier select + Cost/unit**. Demo: 2 suppliers seeded, 5/6 ingredients linked.
+- ✅ Verified curl: supplier create; receive 30kg fries @1500 → stock 4→34, purchase total 45000 recorded + in history.
+
 ## ✅✅ LITERAL 100% FLUTTER PARITY REACHED 2026-07-07 (+ inventory & offline & multi-tenant & subscriptions BEYOND Flutter). Commits r1-r4 + inventory `2c97b41` + extras `935f8a7` + KOT `eaf7412`.
 
 - ⚠️ **Documented DEVIATIONS from Flutter** (web uses a simpler single-open-tab model vs Flutter's multi-KOT): no per-item void of an already-sent KOT (can remove lines on reopen before re-send; full void via Orders screen w/ manager PIN); no incremental-KOT round history; no table-transfer dialog; no live kitchen-status chip inside the cart (KDS shows it); cart "void" is done via Orders detail (manager PIN) not a cart button; staff `avatar` field not added (login uses role-derived emoji). All minor.
