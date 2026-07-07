@@ -97,12 +97,18 @@ The EasyCasher frontend is **ONE Vue web app with two areas** (see [[feedback]] 
 - ✅ Build clean; KDS + bump endpoints proven via curl. Full loop: POS sale → auto 'new' on KDS → bump → done.
 - ⚠️ Deferred: real-time via Redis/websockets (currently 5s poll); role-based routing (any logged-in user can open KDS/POS); offline KDS.
 
-## Next
-- ⏭️ Later polish: #5 reports (sales analytics — by day/item/payment), #6 tables/dine-in flow. (#1 settings+tax, #2 receipt, #3 orders+void, #4 KDS — DONE)
+## Step F9 — sales reports (DONE 2026-07-07) — polish item #5
+- Backend: `ReportController@summary` + route `GET /reports` (subscribed group). Tenant-scoped (global scope), **excludes voids** (`status != 'void'`), defaults to last 30 days. Returns `range`, `totals` (orders, gross, net_sales, tax, discounts, tips, avg_ticket — cast int/float in PHP so clean numbers), `by_day` (DATE(placed_at) group), `by_payment` (method group), `by_type` (order_type group), `top_items` (OrderItem SUM(quantity)/SUM(quantity*unit_price) over the range's order ids, top 10 by qty). **BUG FIXED:** an explicit `to` date parsed to 00:00 → dropped the whole final day; now clamps `from->startOfDay()`, `to->endOfDay()` (frontend only sends date-only strings, so this matters for "today").
+- ⚠️ **GOTCHA:** `by_day`/`by_payment`/`by_type`/`top_items` are raw selectRaw rows (not cast) → Postgres numeric aggregates serialize as **strings** ("27250.00"), counts as ints. Frontend coerces every aggregate with `Number()`. Only the top-level `totals` block is pre-cast in PHP.
+- Frontend: `api/reports.ts` (`reportsApi.summary({from,to})` + `ReportSummary` types), `views/ReportsView.vue` (route `/reports`, sidebar 📈, child of AppLayout). Today/7d/30d presets, 4 stat cards, CSS by-day bar chart (no chart lib), payment + order-type breakdown bars, top-items table w/ qty bars. Empty-period guard (no divide-by-zero; "No sales in this period").
+- ✅ Verified END-TO-END: build clean (TS+Tailwind) + `php -l` clean; hit `/reports` via login token — totals/breakdowns/top-items correct, void excluded (3 orders→2 counted); single-day range returns its orders after the endOfDay fix; empty day returns safe zeros.
 
-## ⏸️ SESSION PAUSED 2026-07-06 (resume tomorrow)
-- **RESUME AT: polish #5 — Reports** (sales analytics: totals by day, top items, payment-method breakdown; dashboard already has basic stat cards to build on).
-- **⚠️ PENDING PUSH:** commits `28716a7` (#3 orders+void) + `27909b3` (#4 KDS) are committed locally in easycasher-saas but NOT yet pushed to GitHub. First thing next session: remind user to run `unset GITHUB_TOKEN && gh auth setup-git && git push` in their terminal (see [[saas-backend]] push gotcha). Everything through #2 (receipt, 7b9027e) IS pushed.
+## Next
+- ⏭️ Later polish: #6 tables/dine-in flow (tables API already exists on backend). (#1 settings+tax, #2 receipt, #3 orders+void, #4 KDS, #5 reports — DONE)
+
+## ⏸️ SESSION 2026-07-07
+- **RESUME AT: polish #6 — tables/dine-in flow** (backend `tables` apiResource already exists; wire a floor/table picker into POS dine-in + link orders to a table).
+- **⚠️ PENDING PUSH:** commit `48a644a` (#5 reports) is committed locally in easycasher-saas (branch `main`) but NOT yet pushed. Remind user to run `unset GITHUB_TOKEN && gh auth setup-git && git push` in their terminal (see [[saas-backend]] push gotcha). Everything through #4 (KDS `27909b3`, orders+void `28716a7`) IS already pushed.
 - Dev servers were shut down at end of session. To restart: pg+redis `docker start easycasher-pg easycasher-redis`; api `cd /workspaces/easycasher-saas/api && php artisan serve --host 0.0.0.0 --port=8000`; frontend `cd /workspaces/easycasher-saas/dashboard && npm run dev -- --port 5173`. Reseed if needed: `php artisan migrate:fresh --seed --force` (resets 14-day trial + demo data w/ 15% tax). (needs a tenant-settings endpoint on backend + wire into cart `total`); receipt print (`window.print` or backend PDF); dine-in tables flow (tables API exists); incremental catalog pull via `/sync` PULL + `last_synced_at` (currently full GET each online load); real PWA icons.
 - Also revisit: `/sync` sits behind the `subscribed` 402 gate → a lapsed tenant's queued offline orders won't push until they renew (they stay safely queued). See [[saas-backend]] grace-period note.
 - **Pushed to GitHub 2026-07-06:** part of the private monorepo **github.com/shahohabib87/easycasher-saas** (branch `main`) alongside `api/` — see [[saas-backend]]. Ask before pushing NEW code (per [[feedback]]).
