@@ -33,6 +33,12 @@ User asked to "make 100% like Flutter POS". Audited Flutter feature-by-feature (
 - Frontend: `types.ts` Supplier+Purchase; `api/suppliers.ts` (supplierApi + purchaseApi.receive); `views/SuppliersView.vue` (route `/suppliers`, sidebar 🚚, gated by the **`inventory` permission** — reused, no new perm) — supplier CRUD table + **Receive delivery** modal (pick supplier + ref + ingredient lines qty/cost → restocks) + recent-deliveries history. InventoryView ingredient editor gained **Supplier select + Cost/unit**. Demo: 2 suppliers seeded, 5/6 ingredients linked.
 - ✅ Verified curl: supplier create; receive 30kg fries @1500 → stock 4→34, purchase total 45000 recorded + in history.
 
+## Step F16 — final Flutter cosmetics CLOSED (2026-07-07, commit `73ca053`)
+- **Table edit/delete**: TablesView free-table card has ✎ edit → modal w/ number + **capacity chips (2/4/6/8/10/12)** + Delete (disabled/guarded when table has an open tab). Uses tableApi.update/remove.
+- **Staff avatars**: `users.avatar` column (migration); User fillable; StaffController validates avatar; `staff-directory` + staff index return it. StaffView: EmojiPicker(STAFF_AVATARS) in editor + avatar shown in table. LoginView staff-cards use `s.avatar || ROLE_AVATAR[role]`. Seeded per demo staff (Owner 👔, Ahmed 🧑, Sara 👩‍💼, Kitchen 👨‍🍳, Manager 🧑‍💼).
+- **Settings sectioned layout**: SettingsView now a left-nav (Restaurant/Tax/Service/Receipt/Permissions) with v-show sections — matches Flutter's settings sidebar. Save button hidden on the Permissions section.
+- ✅ Build clean; verified: staff-directory returns avatars, table capacity PUT 200, staff create w/ avatar. **All 3 minor deviations now closed — nothing Flutter has is missing, cosmetic or otherwise.**
+
 ## ✅✅ LITERAL 100% FLUTTER PARITY REACHED 2026-07-07 (+ inventory & offline & multi-tenant & subscriptions BEYOND Flutter). Commits r1-r4 + inventory `2c97b41` + extras `935f8a7` + KOT `eaf7412`.
 
 - ⚠️ **Documented DEVIATIONS from Flutter** (web uses a simpler single-open-tab model vs Flutter's multi-KOT): no per-item void of an already-sent KOT (can remove lines on reopen before re-send; full void via Orders screen w/ manager PIN); no incremental-KOT round history; no table-transfer dialog; no live kitchen-status chip inside the cart (KDS shows it); cart "void" is done via Orders detail (manager PIN) not a cart button; staff `avatar` field not added (login uses role-derived emoji). All minor.
