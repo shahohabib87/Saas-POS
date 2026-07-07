@@ -28,4 +28,9 @@ Platform super admin = the EasyCasher-company operator who sits ABOVE all restau
 - `views/SuperAdminView.vue` (route `/admin`, dark full-page console): 6 stat cards (restaurants/active/trial/MRR/orders/revenue) + restaurants table (status badge, plan, ends, staff/orders/revenue) + row actions Suspend / Activate / +14d trial.
 - ✅ Verified curl: super login (tenant null), stats (2 tenants, MRR 50000), tenants list, owner→/admin 403, suspend/activate/extend all work.
 
-## ⏭️ Possible extensions: plans-editing UI on the console; platform-wide charts; per-tenant drill-in; impersonate-tenant; audit log; make-another-user-super-admin UI (currently only via seeder/DB).
+## Console additions (2026-07-07, commit `5289128`)
+- **Editable plan pricing** — plans section (name/price/active) → `PUT /admin/plans/{plan}`.
+- **Platform-admin management** — `GET /admin/admins`, `POST /admin/admins` (create super admin: name/email/password → is_super_admin true, tenant_id null), `DELETE /admin/admins/{user}` (revoke; guards: not-a-platform-admin 422, can't-remove-self 422, can't-remove-last 422). UI: list + add form + remove. Verified: plan 50k→60k, add admin (logs in as super), remove 204.
+- **Restaurants-by-status bar chart** (active/trial/suspended/cancelled) from stats.
+
+## ⏭️ Possible extensions: per-tenant drill-in; impersonate-tenant; audit log; platform charts over time (signups/MRR trend).
