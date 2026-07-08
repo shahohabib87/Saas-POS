@@ -40,4 +40,7 @@ Platform super admin = the EasyCasher-company operator who sits ABOVE all restau
 - 🐛 Fixed `auth.setSession` crashing on null tenant (super admin has none) — now guards `tenant?.slug`.
 - ✅ Verified curl: detail (staff/orders/revenue), signups (6 months), impersonate (token as owner Rawa). Build clean.
 
-## ⏭️ Still possible later: audit log; MRR-over-time chart; onboard-a-restaurant from console.
+## Onboard-a-restaurant (2026-07-08, commit `1779788`)
+- `POST /admin/tenants` (SuperAdminController@storeTenant): validates {restaurant_name, owner_name, owner_email (unique), owner_password, plan?}; auto unique slug; status=trial (14d) or active(+30d) if plan given; creates owner user (role admin, email+password, default pin 9999). Frontend: **"+ Add restaurant"** button by the Restaurants heading → modal (name, owner name, plan dropdown [14-day trial | Basic | Pro], owner email/password). Verified: trial+Pro create, new owner logs in, count 2→4.
+
+## ⏭️ Still possible later: audit log; MRR-over-time chart.
