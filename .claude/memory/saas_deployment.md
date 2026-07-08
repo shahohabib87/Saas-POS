@@ -53,6 +53,20 @@ Deploying EasyCasher ([[saas-backend]] + [[saas-frontend]] at /workspaces/easyca
 - ✅ Verified over HTTP (Host header): `GET /api/plans` → 200 + JSON; `/` → 200 SPA. Storage chown apache:apache.
 - ⚠️ On future frontend changes: rebuild dist + re-copy into api/public. Consider a deploy script.
 
+## ⏸️ PAUSED 2026-07-08 (evening) — ONE open issue before SSL
+- **DNS works** ✅ — `app.easycasherorder.online` resolves to the droplet; the domain loads in a browser over HTTP.
+- **API works** ✅ — `curl /api/plans` returns correct JSON.
+- **OPEN ISSUE:** the domain root `/` shows the **Laravel default welcome page**, NOT the Vue app. Cause: `api/public/index.html` is **732 bytes dated 20:10 (git-clone time)** — the `cp -r dist/* api/public/` apparently did NOT overwrite the built files (stale/placeholder served). NOTE: `api/public/index.html` may be committed in the repo (old placeholder) — the force-copy must replace it.
+  - Server `routes/web.php` correctly has ONLY the `Route::fallback()` serving `public_path('index.html')` (no welcome route) — so the welcome page is puzzling; likely stale index.html/assets OR browser cache. MUST verify with `curl` (not browser).
+- **RESUME STEP 1 (do first):** re-copy the real build + verify:
+  ```
+  cp -rf /var/www/easycasher/dashboard/dist/* /var/www/easycasher/api/public/
+  ls /var/www/easycasher/api/public/assets | head          # expect index-*.js / index-*.css
+  curl -s -H "Host: app.easycasherorder.online" http://127.0.0.1/ | head -c 300   # expect <div id="app"> + /assets/index-*.js (Vue), NOT welcome
+  ```
+  Then hard-refresh browser (Ctrl+Shift+R). If curl still shows welcome, investigate: is `api/public/index.html` the Vue build? are `assets/*` present? is DirectoryIndex serving index.html? (vhost has `DirectoryIndex index.html index.php`). Consider a deploy step that always copies dist→public after each build.
+- **RESUME STEP 2:** once `/` shows the Vue app → HTTPS (below).
+
 ## ⏭️ RESUME — DNS + HTTPS (last step)
 - Verify `dig +short app.easycasherorder.online` = 161.35.31.51 (user said A record added).
 - Domain is a **manual vhost NOT managed by CWP**, so CWP AutoSSL won't auto-cover it. Use **certbot webroot**: `dnf install -y certbot`; `certbot certonly --webroot -w /var/www/easycasher/api/public -d app.easycasherorder.online` (Laravel .htaccess serves the real .well-known challenge file since RewriteCond !-f passes). Then add a **:443 SSL vhost** (same docroot/handler + SSLCertificateFile/KeyFile from /etc/letsencrypt/live/...) and an HTTP→HTTPS redirect. Reload httpd. Set up cert auto-renew (certbot renew cron/timer + httpd reload hook).
