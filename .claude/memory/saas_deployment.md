@@ -36,8 +36,19 @@ Deploying EasyCasher ([[saas-backend]] + [[saas-frontend]] at /workspaces/easyca
 - Binary at `/opt/remi/php83/root/usr/bin/php`; made shortcut **`ln -sf /opt/remi/php83/root/usr/bin/php /usr/local/bin/php83`** → **`php83`** works. Confirmed **PHP 8.3.32** + **pdo_pgsql, pgsql**, mbstring, bcmath, ctype, curl, openssl, fileinfo, tokenizer, xml. ✅
 - CLI = `php83`. Composer = `php83 /usr/local/bin/composer` (composer 2.10.2 already installed). Web-serving = Remi **php83-php-fpm** (installed; still need to enable + point the app vhost at its socket).
 
-## ⏭️ RESUME — next steps
-1. ✅ PHP 8.3 CLI done. NEXT: create PostgreSQL DB+user for EasyCasher (PG16 running). Watch pg_hba.conf — may need `scram-sha-256`/`md5` for 127.0.0.1 host auth so Laravel can connect with a password. Test with `php83 -r` or psql.
+## ✅ BACKEND DEPLOYED + CONFIRMED (2026-07-08)
+- **PHP 8.4 needed (not 8.3!):** composer.lock (built in Codespace on PHP 8.4) pins Symfony 8.1 which requires php>=8.4.1. Installed Remi **php84** (`yum install php84-php-cli php84-php-fpm php84-php-pgsql php84-php-mbstring php84-php-bcmath php84-php-xml php84-php-opcache php84-php-intl php84-php-common`), shortcut `ln -sf /opt/remi/php84/root/usr/bin/php /usr/local/bin/php84`. **Use `php84` for everything** (composer/artisan/fpm). (php83 left installed, unused.)
+- Code cloned to **`/var/www/easycasher`** (deploy key `/root/.ssh/easycasher_deploy`, added to GitHub repo Deploy keys, read-only). `git clone git@github.com:...` worked.
+- `cd /var/www/easycasher/api && php84 /usr/local/bin/composer install --no-dev --optimize-autoloader` ✅ (Laravel 13.18.1).
+- `.env`: APP_ENV=production, APP_DEBUG=false, APP_URL=https://app.easycasherorder.online, DB pgsql 127.0.0.1:5432 easycasher/easycasher, **DB_PASSWORD=EasyCasher2026DB** (also set on the PG role; localhost-only), CACHE_STORE=file, SESSION_DRIVER=file, QUEUE_CONNECTION=sync. `php84 artisan key:generate` done.
+- PG `easycasher` DB+role reused (leftover from earlier attempt; relay is on MySQL not PG). pg_hba already `scram-sha-256` for 127.0.0.1 — no change needed.
+- `php84 artisan migrate --seed --force` ✅ — **backend confirmed** (tenants + super-admin + plans seeded). Super admin: **superadmin@easycasher.test / password**.
+
+## ⏭️ RESUME — final stretch (WEB SERVING)
+1. **Frontend build:** Node on droplet is v14 (too old). Install Node 20 (NodeSource el8) → `cd /var/www/easycasher/dashboard && npm ci && npm run build` → produces `dist/`. (Avoids Codespace→droplet transfer.) Frontend axios baseURL is relative `/api`, so no env needed (same-domain serving).
+2. **php84-fpm:** enable/start Remi `php84-php-fpm` service; note its socket path (likely `/var/opt/remi/php84/run/php-fpm/www.sock`).
+3. **Apache vhost** for app.easycasherorder.online (CWP is Apache): DocumentRoot=/var/www/easycasher/dashboard/dist; SPA fallback to index.html; route `/api` to Laravel `api/public/index.php` via php84-fpm (mod_proxy_fcgi / SetHandler). Watch CWP vhost management — may need a custom/standalone vhost that CWP won't clobber. Storage perms: `chown -R apache:apache /var/www/easycasher/api/storage /var/www/easycasher/api/bootstrap/cache`.
+4. **AutoSSL/Let's Encrypt** once DNS (app→161.35.31.51) resolves. DNS A record: user said added ("all done").
 2. Create the `app.easycasherorder.online` subdomain in CWP (under an account — NOT ecrelay's).
 3. Deploy key + git clone the private repo onto droplet (api/ only; dist built locally & uploaded).
 4. API: composer install --no-dev, .env (Postgres creds, APP_URL=https://app.easycasherorder.online, key:generate), migrate --seed, storage perms.
