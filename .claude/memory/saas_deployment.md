@@ -44,7 +44,20 @@ Deploying EasyCasher ([[saas-backend]] + [[saas-frontend]] at /workspaces/easyca
 - PG `easycasher` DB+role reused (leftover from earlier attempt; relay is on MySQL not PG). pg_hba already `scram-sha-256` for 127.0.0.1 — no change needed.
 - `php84 artisan migrate --seed --force` ✅ — **backend confirmed** (tenants + super-admin + plans seeded). Super admin: **superadmin@easycasher.test / password**.
 
-## ⏭️ RESUME — final stretch (WEB SERVING)
+## ✅ APP SERVING OVER HTTP (2026-07-08) — full stack live on droplet
+- **Node:** system node was v14 (too old); installed **nvm + Node 20** (`. "$HOME/.nvm/nvm.sh"; nvm use 20`), built `dist/` on the droplet (`cd /var/www/easycasher/dashboard && npm ci && npm run build`).
+- **KEY ARCHITECTURE:** app is designed for **Laravel to serve the SPA** — `routes/web.php` has `Route::fallback()` returning `public_path('index.html')` for non-API routes. So the correct deploy is **single docroot = `api/public`** with the built Vue files copied in: `cp -r /var/www/easycasher/dashboard/dist/* /var/www/easycasher/api/public/`. (An `Alias /api` + separate dist docroot BREAKS it — Laravel then sees path `/plans` not `/api/plans`, misses the route, hits the fallback, returns index.html.)
+- **Apache = CWP's at `/usr/local/apache`** (binary `/usr/local/apache/bin/httpd`, NOT in PATH; vhosts in `/usr/local/apache/conf.d/vhosts/`, reload `systemctl reload httpd`). Apache runs as **User/Group `nobody`**. SELinux **Disabled**.
+- **vhost** `/usr/local/apache/conf.d/vhosts/app.easycasherorder.online.conf`: DocumentRoot=/var/www/easycasher/api/public; `<Directory>` AllowOverride All + DirectoryIndex index.html index.php; `<FilesMatch \.php$> SetHandler "proxy:unix:/var/opt/remi/php84/run/php-fpm/www.sock|fcgi://localhost"`. (No Alias, no FallbackResource.)
+- **php84-fpm socket ACL fix:** Apache is `nobody` but fpm socket `listen.acl_users = apache` → 503. Fixed: `listen.acl_users = apache,nobody` in `/etc/opt/remi/php84/php-fpm.d/www.conf` + `systemctl restart php84-php-fpm`.
+- ✅ Verified over HTTP (Host header): `GET /api/plans` → 200 + JSON; `/` → 200 SPA. Storage chown apache:apache.
+- ⚠️ On future frontend changes: rebuild dist + re-copy into api/public. Consider a deploy script.
+
+## ⏭️ RESUME — DNS + HTTPS (last step)
+- Verify `dig +short app.easycasherorder.online` = 161.35.31.51 (user said A record added).
+- Domain is a **manual vhost NOT managed by CWP**, so CWP AutoSSL won't auto-cover it. Use **certbot webroot**: `dnf install -y certbot`; `certbot certonly --webroot -w /var/www/easycasher/api/public -d app.easycasherorder.online` (Laravel .htaccess serves the real .well-known challenge file since RewriteCond !-f passes). Then add a **:443 SSL vhost** (same docroot/handler + SSLCertificateFile/KeyFile from /etc/letsencrypt/live/...) and an HTTP→HTTPS redirect. Reload httpd. Set up cert auto-renew (certbot renew cron/timer + httpd reload hook).
+
+## ⏭️ (superseded) earlier WEB SERVING notes
 1. **Frontend build:** Node on droplet is v14 (too old). Install Node 20 (NodeSource el8) → `cd /var/www/easycasher/dashboard && npm ci && npm run build` → produces `dist/`. (Avoids Codespace→droplet transfer.) Frontend axios baseURL is relative `/api`, so no env needed (same-domain serving).
 2. **php84-fpm:** enable/start Remi `php84-php-fpm` service; note its socket path (likely `/var/opt/remi/php84/run/php-fpm/www.sock`).
 3. **Apache vhost** for app.easycasherorder.online (CWP is Apache): DocumentRoot=/var/www/easycasher/dashboard/dist; SPA fallback to index.html; route `/api` to Laravel `api/public/index.php` via php84-fpm (mod_proxy_fcgi / SetHandler). Watch CWP vhost management — may need a custom/standalone vhost that CWP won't clobber. Storage perms: `chown -R apache:apache /var/www/easycasher/api/storage /var/www/easycasher/api/bootstrap/cache`.
