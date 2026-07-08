@@ -33,4 +33,11 @@ Platform super admin = the EasyCasher-company operator who sits ABOVE all restau
 - **Platform-admin management** — `GET /admin/admins`, `POST /admin/admins` (create super admin: name/email/password → is_super_admin true, tenant_id null), `DELETE /admin/admins/{user}` (revoke; guards: not-a-platform-admin 422, can't-remove-self 422, can't-remove-last 422). UI: list + add form + remove. Verified: plan 50k→60k, add admin (logs in as super), remove 204.
 - **Restaurants-by-status bar chart** (active/trial/suspended/cancelled) from stats.
 
-## ⏭️ Possible extensions: per-tenant drill-in; impersonate-tenant; audit log; platform charts over time (signups/MRR trend).
+## "Finish" additions (2026-07-08, commit `5636fdf`)
+- **Restaurant drill-in**: `GET /admin/tenants/{tenant}` (tenant + settings + staff list + 10 recent orders + revenue). Frontend: clickable rows → AppModal detail drawer (staff chips, recent orders, revenue/phone).
+- **Impersonate**: `POST /admin/tenants/{tenant}/impersonate` → Sanctum token for the tenant's owner (admin, token label 'impersonation'). Frontend: `auth.startImpersonation()` stashes super session in localStorage `easycasher.superStash`, becomes the tenant, loads perms, opens `/`; **amber banner in AppLayout** "Viewing X as support · Exit" → `stopImpersonation()` restores super session → `/admin`. Guard already works: impersonated user isn't super_admin so normal tenant routing applies; on exit super_admin=true forces back to /admin.
+- **Search** restaurants (client filter) + **signups bar chart** (`GET /admin/signups`, new restaurants/month × 6).
+- 🐛 Fixed `auth.setSession` crashing on null tenant (super admin has none) — now guards `tenant?.slug`.
+- ✅ Verified curl: detail (staff/orders/revenue), signups (6 months), impersonate (token as owner Rawa). Build clean.
+
+## ⏭️ Still possible later: audit log; MRR-over-time chart; onboard-a-restaurant from console.
