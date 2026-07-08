@@ -30,8 +30,14 @@ Deploying EasyCasher ([[saas-backend]] + [[saas-frontend]] at /workspaces/easyca
 - **DNS = not set up yet.** User adds A record **`app` → 161.35.31.51** at their registrar (registrar name still TBD). Verify propagation before AutoSSL.
 - Deploy shape: subdomain docroot serves Vue `dist/` + `.htaccess` SPA fallback + `api/` (Laravel public) routed at `/api`; axios baseURL `/api` (relative, no CORS). CWP AutoSSL for the cert.
 
+## ✅ PHP 8.3 SOLVED (2026-07-08) — via REMI, not CWP alt-php
+- CWP's alt-php83 was broken (empty `/opt/alt/php83`, `/opt/alt/php-fpm83`; no rpm; imagick/sodium build failed on missing phpize — those exts NOT needed anyway). **Skip CWP's PHP Selector.**
+- Installed **Remi** packages instead: `yum install php83-php-cli php83-php-fpm php83-php-pgsql php83-php-mbstring php83-php-bcmath php83-php-xml php83-php-opcache php83-php-intl php83-php-common`.
+- Binary at `/opt/remi/php83/root/usr/bin/php`; made shortcut **`ln -sf /opt/remi/php83/root/usr/bin/php /usr/local/bin/php83`** → **`php83`** works. Confirmed **PHP 8.3.32** + **pdo_pgsql, pgsql**, mbstring, bcmath, ctype, curl, openssl, fileinfo, tokenizer, xml. ✅
+- CLI = `php83`. Composer = `php83 /usr/local/bin/composer` (composer 2.10.2 already installed). Web-serving = Remi **php83-php-fpm** (installed; still need to enable + point the app vhost at its socket).
+
 ## ⏭️ RESUME — next steps
-1. **PHP 8.3:** from CWP PHP-FPM Selector/Version Switcher, install 8.3 + exts, assign to `app` subdomain; get an 8.3 CLI for composer/artisan. (Waiting on user's CWP menu + `.so` diagnostic.)
+1. ✅ PHP 8.3 CLI done. NEXT: create PostgreSQL DB+user for EasyCasher (PG16 running). Watch pg_hba.conf — may need `scram-sha-256`/`md5` for 127.0.0.1 host auth so Laravel can connect with a password. Test with `php83 -r` or psql.
 2. Create the `app.easycasherorder.online` subdomain in CWP (under an account — NOT ecrelay's).
 3. Deploy key + git clone the private repo onto droplet (api/ only; dist built locally & uploaded).
 4. API: composer install --no-dev, .env (Postgres creds, APP_URL=https://app.easycasherorder.online, key:generate), migrate --seed, storage perms.
