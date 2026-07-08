@@ -17,10 +17,25 @@ Deploying EasyCasher ([[saas-backend]] + [[saas-frontend]] at /workspaces/easyca
 - Serve **dashboard/dist** (Vue SPA static) at the domain root; route **/api** to the **api/** Laravel backend (public/index.php). Frontend axios baseURL stays `/api` (relative) — no CORS, no VITE env needed. On Apache/CWP this is a subdomain docroot + an /api alias, OR two subdomains (app + api) if the alias is fiddly. Decide once we see if CWP uses Apache or nginx.
 - Private repo → get code onto droplet via a **deploy key** (generate on droplet, add to GitHub repo) or HTTPS + PAT.
 
-## ⏭️ RESUME TOMORROW — first steps
-1. Get discovery output the user was about to paste: `cat /etc/os-release`; PHP versions (`ls /usr/local/php*/ /opt/alt/php*`, `php -v`); `which psql node npm`; `systemctl is-active httpd nginx postgresql mariadb mysqld`; relay's `.env` DB_CONNECTION. → tailor exact steps.
-2. Confirm: which domain/subdomain for EasyCasher (added in CWP? DNS → droplet IP?); is `easycasher-relay` related.
-3. Then: (a) ensure PostgreSQL; (b) create CWP domain/user + docroots; (c) deploy key + git clone; (d) API: composer install --no-dev, .env (Postgres creds, APP_URL, key:generate), migrate --seed, storage perms; (e) frontend: npm ci && npm run build; (f) point docroots; (g) CWP AutoSSL/Let's Encrypt.
+## ✅ Discovery CONFIRMED (2026-07-08) — droplet facts
+- **Droplet IP: `161.35.31.51`**. CWP admin at **`https://161.35.31.51:2087`** (self-signed). OS = **AlmaLinux 8.10** (el8/RHEL family).
+- **PostgreSQL 16.14 installed + running** ✅ (`psql` at /usr/bin/psql). NO MySQL port needed — big win.
+- **Composer 2.10.2** installed ✅ (/usr/local/bin/composer).
+- **Apache (httpd) active** ✅; nginx inactive. mariadb/mysqld also active (unused by us).
+- **PHP problem:** default CLI PHP = **8.1.34** (/usr/local/php). alt-php present: `/opt/alt/php81`, `/opt/alt/php-fpm81/82/83`. **NO 8.3 CLI** (`/opt/alt/php83` missing) and 8.3 FPM extensions (pgsql/mbstring) UNCONFIRMED. App needs **PHP ^8.3** (Laravel 13.18) for BOTH web (FPM) and CLI (composer/artisan). → must install/enable PHP 8.3 + exts (pdo_pgsql, mbstring, bcmath, curl, xml, fileinfo, openssl, tokenizer, ctype) via **CWP panel** (safest; don't disturb relay or global 8.1). Awaiting user's CWP PHP-menu labels + `.so` diagnostic.
+- **Node on droplet = v14.15.3 (too old for Vite 8)** → **build frontend in the Codespace (Node 24) and upload `dist/`**; never build on droplet.
+
+## ✅ Decisions locked (2026-07-08)
+- **Host = `app.easycasherorder.online`** (subdomain; apex left free). Dedicated domain `easycasherorder.online`.
+- **DNS = not set up yet.** User adds A record **`app` → 161.35.31.51** at their registrar (registrar name still TBD). Verify propagation before AutoSSL.
+- Deploy shape: subdomain docroot serves Vue `dist/` + `.htaccess` SPA fallback + `api/` (Laravel public) routed at `/api`; axios baseURL `/api` (relative, no CORS). CWP AutoSSL for the cert.
+
+## ⏭️ RESUME — next steps
+1. **PHP 8.3:** from CWP PHP-FPM Selector/Version Switcher, install 8.3 + exts, assign to `app` subdomain; get an 8.3 CLI for composer/artisan. (Waiting on user's CWP menu + `.so` diagnostic.)
+2. Create the `app.easycasherorder.online` subdomain in CWP (under an account — NOT ecrelay's).
+3. Deploy key + git clone the private repo onto droplet (api/ only; dist built locally & uploaded).
+4. API: composer install --no-dev, .env (Postgres creds, APP_URL=https://app.easycasherorder.online, key:generate), migrate --seed, storage perms.
+5. Point docroot; CWP AutoSSL/Let's Encrypt.
 - Removed a premature Ubuntu-oriented `deploy/nginx-easycasher.conf` (wrong for CWP) — recreate an **Apache/CWP-appropriate** config instead.
 
 ## Push state at pause
