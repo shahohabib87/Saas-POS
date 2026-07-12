@@ -12,6 +12,7 @@ import 'package:easycasher/features/cashier/models/category.dart';
 import 'package:easycasher/features/cashier/models/menu_item.dart';
 import 'package:easycasher/features/cashier/models/modifier.dart';
 import 'package:easycasher/features/payment/models/payment.dart';
+import 'package:easycasher/features/locations/models/location.dart';
 import 'package:easycasher/features/settings/models/app_settings.dart';
 import 'package:easycasher/features/tables/models/restaurant_table.dart';
 
@@ -716,6 +717,24 @@ class AppDatabase extends _$AppDatabase {
       }
     });
   }
+
+  // ── Locations (delivery neighbourhoods) ───────────────────────────────────
+  // Stored as a JSON blob in settingsKv (key 'locations') so no schema change
+  // is needed. Mirrors the modifier-groups JSON approach used for menu items.
+
+  Future<List<Location>> getLocations() async {
+    final raw = await _getSetting('locations');
+    if (raw == null || raw.isEmpty) return [];
+    final list = jsonDecode(raw) as List;
+    return list
+        .map((e) => Location.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> saveLocations(List<Location> locations) => _setSetting(
+        'locations',
+        jsonEncode(locations.map((l) => l.toJson()).toList()),
+      );
 
   // ── Order counter (daily reset) ───────────────────────────────────────────
 

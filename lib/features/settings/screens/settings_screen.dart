@@ -5,12 +5,14 @@ import 'package:easycasher/core/constants/app_colors.dart';
 import 'package:easycasher/features/auth/models/app_permission.dart';
 import 'package:easycasher/features/auth/models/staff.dart';
 import 'package:easycasher/features/auth/providers/auth_provider.dart';
+import 'package:easycasher/features/locations/models/location.dart';
+import 'package:easycasher/features/locations/providers/locations_provider.dart';
 import 'package:easycasher/features/settings/models/app_settings.dart';
 import 'package:easycasher/features/settings/providers/settings_provider.dart';
 import 'package:easycasher/features/tables/models/restaurant_table.dart';
 import 'package:easycasher/features/tables/providers/tables_provider.dart';
 
-enum _Section { restaurant, serviceMode, tax, receipt, staff, tables, permissions }
+enum _Section { restaurant, serviceMode, tax, receipt, staff, tables, locations, permissions }
 
 extension _SectionX on _Section {
   String get label => switch (this) {
@@ -20,6 +22,7 @@ extension _SectionX on _Section {
         _Section.receipt     => 'Receipt',
         _Section.staff       => 'Staff',
         _Section.tables      => 'Tables',
+        _Section.locations   => 'Locations',
         _Section.permissions => 'Permissions',
       };
   IconData get icon => switch (this) {
@@ -29,6 +32,7 @@ extension _SectionX on _Section {
         _Section.receipt     => Icons.receipt_long_rounded,
         _Section.staff       => Icons.people_rounded,
         _Section.tables      => Icons.table_restaurant_rounded,
+        _Section.locations   => Icons.location_on_rounded,
         _Section.permissions => Icons.shield_rounded,
       };
 }
@@ -202,6 +206,7 @@ class _SectionContent extends ConsumerWidget {
         _Section.receipt     => _ReceiptSection(settings: settings),
         _Section.staff       => const _StaffSection(),
         _Section.tables      => const _TablesSection(),
+        _Section.locations   => const _LocationsSection(),
         _Section.permissions => const _PermissionsSection(),
       },
     );
@@ -1642,6 +1647,277 @@ class _TableDialogState extends State<_TableDialog> {
                     ),
                     onPressed: _save,
                     child: Text(isEdit ? 'Save' : 'Add Table'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Locations section (delivery neighbourhoods) ─────────────────────────────
+
+class _LocationsSection extends ConsumerWidget {
+  const _LocationsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final locations = ref.watch(locationsProvider);
+
+    return _SectionShell(
+      title: 'Locations',
+      subtitle: 'Delivery neighbourhoods customers can choose from',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Spacer(),
+              ElevatedButton.icon(
+                onPressed: () => _showDialog(context, ref, null),
+                icon: const Icon(Icons.add_rounded, size: 16),
+                label: const Text('Add Location'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
+                  textStyle: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _Card(
+            child: locations.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: Text(
+                        'No locations yet. Tap "Add Location" to get started.',
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.onSurfaceVariant),
+                      ),
+                    ),
+                  )
+                : Column(
+                    children: [
+                      for (int i = 0; i < locations.length; i++) ...[
+                        if (i > 0)
+                          const Divider(
+                              height: 1, color: AppColors.outlineVariant),
+                        _LocationRow(
+                          location: locations[i],
+                          onEdit: () =>
+                              _showDialog(context, ref, locations[i]),
+                          onDelete: () =>
+                              _confirmDelete(context, ref, locations[i]),
+                        ),
+                      ],
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDialog(BuildContext context, WidgetRef ref, Location? existing) {
+    showDialog(
+      context: context,
+      builder: (_) => _LocationDialog(
+        existing: existing,
+        onSave: (name) {
+          if (existing == null) {
+            ref.read(locationsProvider.notifier).add(name);
+          } else {
+            ref.read(locationsProvider.notifier).update(existing.id, name);
+          }
+        },
+      ),
+    );
+  }
+
+  void _confirmDelete(
+      BuildContext context, WidgetRef ref, Location location) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Text('Delete Location?',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        content: Text(
+          'Remove "${location.name}"? This cannot be undone.',
+          style: const TextStyle(
+              fontSize: 13, color: AppColors.onSurfaceVariant),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              ref.read(locationsProvider.notifier).remove(location.id);
+              Navigator.pop(ctx);
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocationRow extends StatelessWidget {
+  final Location location;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _LocationRow(
+      {required this.location,
+      required this.onEdit,
+      required this.onDelete});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.primaryFixed,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.location_on_rounded,
+                color: AppColors.primary, size: 20),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(location.name,
+                style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.onSurface)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit_rounded,
+                size: 18, color: AppColors.onSurfaceVariant),
+            onPressed: onEdit,
+            tooltip: 'Edit',
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline_rounded,
+                size: 18, color: AppColors.danger),
+            onPressed: onDelete,
+            tooltip: 'Delete',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocationDialog extends StatefulWidget {
+  final Location? existing;
+  final void Function(String name) onSave;
+
+  const _LocationDialog({required this.existing, required this.onSave});
+
+  @override
+  State<_LocationDialog> createState() => _LocationDialogState();
+}
+
+class _LocationDialogState extends State<_LocationDialog> {
+  late final TextEditingController _name;
+
+  @override
+  void initState() {
+    super.initState();
+    _name = TextEditingController(text: widget.existing?.name ?? '');
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final name = _name.text.trim();
+    if (name.isEmpty) return;
+    widget.onSave(name);
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isEdit = widget.existing != null;
+    return Dialog(
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: SizedBox(
+        width: 340,
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isEdit ? 'Edit Location' : 'Add Location',
+                style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.onSurface),
+              ),
+              const SizedBox(height: 20),
+              const _FieldLabel('LOCATION NAME'),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _name,
+                autofocus: true,
+                textCapitalization: TextCapitalization.words,
+                decoration: _inputDec('e.g. Downtown'),
+                style: const TextStyle(fontSize: 14),
+                onSubmitted: (_) => _save(),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
+                    ),
+                    onPressed: _save,
+                    child: Text(isEdit ? 'Save' : 'Add Location'),
                   ),
                 ],
               ),
