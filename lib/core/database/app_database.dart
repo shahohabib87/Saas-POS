@@ -762,6 +762,55 @@ class AppDatabase extends _$AppDatabase {
   Future<void> persistCounter(int value) =>
       _setSetting('_orderCounter', value.toString());
 
+  // ── Cloud sync support ────────────────────────────────────────────────────
+  // Generic key-value access (token, tenant info, cached driver/area JSON).
+
+  Future<String?> kvGet(String key) => _getSetting(key);
+
+  Future<void> kvSet(String key, String value) => _setSetting(key, value);
+
+  Future<void> kvDelete(String key) =>
+      (delete(settingsKv)..where((t) => t.key.equals(key))).go();
+
+  /// Replace the whole catalog with the cloud copy (initial pull).
+  /// Keeps the special 'all' pseudo-category the cashier grid relies on.
+  Future<void> replaceCatalog(
+      List<Category> cats, List<MenuItem> items) async {
+    await transaction(() async {
+      await delete(menuItems).go();
+      await delete(categories).go();
+      await upsertCategory(
+          Category(id: 'all', name: 'All Items', emoji: '🍽️'));
+      for (final c in cats) {
+        if (c.id != 'all') await upsertCategory(c);
+      }
+      for (final m in items) {
+        await upsertMenuItem(m);
+      }
+    });
+  }
+
+  /// Replace all dining tables with the cloud copy (initial pull).
+  Future<void> replaceTables(List<RestaurantTable> tables) async {
+    await transaction(() async {
+      await delete(restaurantTables).go();
+      for (final t in tables) {
+        await upsertTable(t);
+      }
+    });
+  }
+
+  /// Replace the staff list with the cloud copy (initial pull).
+  /// Only called with staff that have a PIN — offline PIN login keeps working.
+  Future<void> replaceStaff(List<Staff> staff) async {
+    await transaction(() async {
+      await delete(staffMembers).go();
+      for (final s in staff) {
+        await upsertStaff(s);
+      }
+    });
+  }
+
   Future<String?> _getSetting(String key) async {
     final row = await (select(settingsKv)
           ..where((t) => t.key.equals(key)))

@@ -9,10 +9,11 @@ import 'package:easycasher/features/locations/models/location.dart';
 import 'package:easycasher/features/locations/providers/locations_provider.dart';
 import 'package:easycasher/features/settings/models/app_settings.dart';
 import 'package:easycasher/features/settings/providers/settings_provider.dart';
+import 'package:easycasher/core/sync/cloud_sync.dart';
 import 'package:easycasher/features/tables/models/restaurant_table.dart';
 import 'package:easycasher/features/tables/providers/tables_provider.dart';
 
-enum _Section { restaurant, serviceMode, tax, receipt, staff, tables, locations, permissions }
+enum _Section { restaurant, serviceMode, tax, receipt, staff, tables, locations, permissions, cloud }
 
 extension _SectionX on _Section {
   String get label => switch (this) {
@@ -24,6 +25,7 @@ extension _SectionX on _Section {
         _Section.tables      => 'Tables',
         _Section.locations   => 'Locations',
         _Section.permissions => 'Permissions',
+        _Section.cloud       => 'Cloud Sync',
       };
   IconData get icon => switch (this) {
         _Section.restaurant  => Icons.storefront_rounded,
@@ -34,6 +36,7 @@ extension _SectionX on _Section {
         _Section.tables      => Icons.table_restaurant_rounded,
         _Section.locations   => Icons.location_on_rounded,
         _Section.permissions => Icons.shield_rounded,
+        _Section.cloud       => Icons.cloud_rounded,
       };
 }
 
@@ -208,6 +211,7 @@ class _SectionContent extends ConsumerWidget {
         _Section.tables      => const _TablesSection(),
         _Section.locations   => const _LocationsSection(),
         _Section.permissions => const _PermissionsSection(),
+        _Section.cloud       => const _CloudSection(),
       },
     );
   }
@@ -1924,6 +1928,203 @@ class _LocationDialogState extends State<_LocationDialog> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─── Cloud Sync ────────────────────────────────────────────────────────────────
+
+class _CloudSection extends ConsumerStatefulWidget {
+  const _CloudSection();
+
+  @override
+  ConsumerState<_CloudSection> createState() => _CloudSectionState();
+}
+
+class _CloudSectionState extends ConsumerState<_CloudSection> {
+  late final TextEditingController _server;
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _server = TextEditingController(
+        text: ref.read(cloudSyncProvider).baseUrl);
+  }
+
+  @override
+  void dispose() {
+    _server.dispose();
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _connect() async {
+    final ok = await ref.read(cloudSyncProvider.notifier).connect(
+          _server.text.trim(),
+          _email.text.trim(),
+          _password.text,
+        );
+    if (ok && mounted) {
+      _password.clear();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Connected — menu, tables and staff downloaded ✓')));
+    }
+  }
+
+  Future<void> _pullNow() async {
+    final ok = await ref.read(cloudSyncProvider.notifier).pullNow();
+    if (ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Catalog refreshed from the cloud ✓')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cloud = ref.watch(cloudSyncProvider);
+
+    return _SectionShell(
+      title: 'Cloud Sync',
+      subtitle:
+          'Connect this device to your EasyCasher cloud account — the POS keeps working offline, data syncs when online',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (cloud.error != null) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: AppColors.danger.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                    color: AppColors.danger.withValues(alpha: 0.4)),
+              ),
+              child: Text(cloud.error!,
+                  style:
+                      const TextStyle(color: AppColors.danger, fontSize: 13)),
+            ),
+          ],
+          if (cloud.connected)
+            _Card(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    const Icon(Icons.cloud_done_rounded,
+                        color: AppColors.success, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            cloud.tenantName.isEmpty
+                                ? 'Connected'
+                                : 'Connected to ${cloud.tenantName}',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: AppColors.onSurface),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            cloud.lastPullAt == null
+                                ? 'Catalog not downloaded yet'
+                                : 'Last download: ${cloud.lastPullAt!.substring(0, 16).replaceFirst('T', ' ')}',
+                            style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 16),
+                  Row(children: [
+                    FilledButton.icon(
+                      onPressed: cloud.busy ? null : _pullNow,
+                      icon: cloud.busy
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.sync_rounded, size: 18),
+                      label: Text(
+                          cloud.busy ? 'Downloading…' : 'Download catalog'),
+                    ),
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
+                      onPressed: cloud.busy
+                          ? null
+                          : () => ref
+                              .read(cloudSyncProvider.notifier)
+                              .disconnect(),
+                      icon: const Icon(Icons.link_off_rounded, size: 18),
+                      label: const Text('Disconnect'),
+                    ),
+                  ]),
+                ],
+              ),
+            )
+          else
+            _Card(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _FieldLabel('SERVER ADDRESS'),
+                  TextField(
+                    controller: _server,
+                    decoration:
+                        _inputDec('https://app.easycasherorder.online'),
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 14),
+                  const _FieldLabel('OWNER / MANAGER EMAIL'),
+                  TextField(
+                    controller: _email,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: _inputDec('you@example.com'),
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 14),
+                  const _FieldLabel('PASSWORD'),
+                  TextField(
+                    controller: _password,
+                    obscureText: true,
+                    decoration: _inputDec('••••••••'),
+                    style: const TextStyle(fontSize: 13),
+                    onSubmitted: (_) => _connect(),
+                  ),
+                  const SizedBox(height: 18),
+                  FilledButton.icon(
+                    onPressed: cloud.busy ? null : _connect,
+                    icon: cloud.busy
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.cloud_rounded, size: 18),
+                    label:
+                        Text(cloud.busy ? 'Connecting…' : 'Connect to Cloud'),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Connecting downloads your menu, tables and staff to this device. '
+                    'After that the POS works fully offline.',
+                    style: TextStyle(
+                        fontSize: 12, color: AppColors.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
