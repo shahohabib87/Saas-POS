@@ -80,7 +80,7 @@ class CloudApi {
   }) async {
     final res = await _dio.post<Map<String, dynamic>>('/sync', data: {
       'orders': orders,
-      if (lastSyncedAt != null) 'last_synced_at': lastSyncedAt,
+      'last_synced_at': ?lastSyncedAt,
     });
     return res.data ?? const {};
   }
