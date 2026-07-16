@@ -8,3 +8,4 @@
 - [SaaS Frontend](saas_frontend.md) — ONE Vue app (dashboard + POS) at /workspaces/easycasher-saas/dashboard — web-only, no Flutter
 - [SaaS Super Admin](saas_superadmin.md) — platform console above all tenants (superadmin@easycasher.test)
 - [SaaS Deployment](saas_deployment.md) — deploying to DO droplet (CWP/CentOS, NOT Ubuntu; existing easycasher-relay project) — resume tomorrow
+- [Flutter POS Sync Plan](flutter_pos_sync_plan.md) — NEXT UP (2026-07-16): wire this Flutter app to the SaaS /api/sync (login → pull → outbox → 60s heartbeat, Cashier/KDS/Tablet modes); server needs zero changes
