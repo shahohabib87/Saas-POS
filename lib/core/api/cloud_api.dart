@@ -73,6 +73,22 @@ class CloudApi {
   Future<List<dynamic>> fetchDrivers() => _list('/drivers');
   Future<List<dynamic>> fetchDeliveryAreas() => _list('/delivery-areas');
 
+  /// The offline-first sync endpoint: push queued orders, get the delta back.
+  Future<Map<String, dynamic>> sync({
+    required List<dynamic> orders,
+    String? lastSyncedAt,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>('/sync', data: {
+      'orders': orders,
+      if (lastSyncedAt != null) 'last_synced_at': lastSyncedAt,
+    });
+    return res.data ?? const {};
+  }
+
+  /// True when the server rejected our token (expired / revoked).
+  static bool isUnauthorized(Object e) =>
+      e is DioException && e.response?.statusCode == 401;
+
   /// Human-readable message out of a Dio error (validation msg if present).
   static String errorMessage(Object e) {
     if (e is DioException) {

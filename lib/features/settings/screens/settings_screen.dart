@@ -2045,9 +2045,41 @@ class _CloudSectionState extends ConsumerState<_CloudSection> {
                       ),
                     ),
                   ]),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: cloud.pendingSales > 0
+                          ? AppColors.warning.withValues(alpha: 0.10)
+                          : AppColors.success.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      cloud.pendingSales > 0
+                          ? '⏳ ${cloud.pendingSales} sale${cloud.pendingSales == 1 ? '' : 's'} waiting to sync'
+                          : '✓ All sales synced to the cloud',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: cloud.pendingSales > 0
+                              ? AppColors.warning
+                              : AppColors.success),
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   Row(children: [
                     FilledButton.icon(
+                      onPressed: cloud.busy
+                          ? null
+                          : () => ref
+                              .read(cloudSyncProvider.notifier)
+                              .flush(),
+                      icon: const Icon(Icons.cloud_upload_rounded, size: 18),
+                      label: const Text('Sync now'),
+                    ),
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
                       onPressed: cloud.busy ? null : _pullNow,
                       icon: cloud.busy
                           ? const SizedBox(
@@ -2124,6 +2156,39 @@ class _CloudSectionState extends ConsumerState<_CloudSection> {
                 ],
               ),
             ),
+          const SizedBox(height: 16),
+          _Card(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _FieldLabel('DEVICE MODE'),
+                const SizedBox(height: 4),
+                Row(children: [
+                  ChoiceChip(
+                    label: const Text('Full POS'),
+                    selected: cloud.deviceMode == DeviceMode.full,
+                    onSelected: (_) => ref
+                        .read(cloudSyncProvider.notifier)
+                        .setDeviceMode(DeviceMode.full),
+                  ),
+                  const SizedBox(width: 10),
+                  ChoiceChip(
+                    label: const Text('Kitchen Display only'),
+                    selected: cloud.deviceMode == DeviceMode.kds,
+                    onSelected: (_) => ref
+                        .read(cloudSyncProvider.notifier)
+                        .setDeviceMode(DeviceMode.kds),
+                  ),
+                ]),
+                const SizedBox(height: 8),
+                const Text(
+                  'Kitchen Display only: whoever logs in on this device lands on the kitchen board.',
+                  style: TextStyle(
+                      fontSize: 12, color: AppColors.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

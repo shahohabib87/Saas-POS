@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:easycasher/core/sync/cloud_sync.dart';
 import 'package:easycasher/core/theme/app_theme.dart';
 import 'package:easycasher/features/auth/models/staff.dart';
 import 'package:easycasher/features/auth/providers/auth_provider.dart';
@@ -13,20 +14,28 @@ class App extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final staff = ref.watch(currentStaffProvider);
+    final deviceMode =
+        ref.watch(cloudSyncProvider.select((s) => s.deviceMode));
 
     return MaterialApp(
       title: 'EasyCasher',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      home: staff == null ? const LoginScreen() : _homeForRole(staff.role),
+      home: staff == null
+          ? const LoginScreen()
+          : _homeFor(staff.role, deviceMode),
     );
   }
 
-  Widget _homeForRole(StaffRole role) => switch (role) {
-        StaffRole.kitchen => const Scaffold(
-            backgroundColor: Color(0xFF0D1117),
-            body: KdsScreen(),
-          ),
-        _ => const CashierScreen(),
-      };
+  /// A device locked to KDS always shows the kitchen board; otherwise the
+  /// staff member's role decides.
+  Widget _homeFor(StaffRole role, DeviceMode mode) {
+    if (mode == DeviceMode.kds || role == StaffRole.kitchen) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0D1117),
+        body: KdsScreen(),
+      );
+    }
+    return const CashierScreen();
+  }
 }
