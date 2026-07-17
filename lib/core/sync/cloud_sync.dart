@@ -294,6 +294,14 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
       'status': 'completed',
       'note': null,
       'placed_at': placedAt,
+      // Delivery details — the server has customer_name/phone/delivery_address
+      // and orders.driver_id. Sent for every order type; they are empty unless
+      // this was an in-house delivery.
+      'customer_name': p.customerName.isEmpty ? null : p.customerName,
+      'phone': p.customerPhone.isEmpty ? null : p.customerPhone,
+      'delivery_address':
+          p.deliveryAddress.isEmpty ? null : p.deliveryAddress,
+      'driver_id': p.driverId,
       'kots': [
         {
           'id': kotId,

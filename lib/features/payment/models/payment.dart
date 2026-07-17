@@ -42,6 +42,18 @@ class CompletedPayment {
 
   final DateTime timestamp;
 
+  // Delivery info — empty for every other order type. Captured at the till
+  // because the driver needs it, and the cloud stores it on the order
+  // (customer_name / phone / delivery_address / driver_id).
+  final String customerName;
+  final String customerPhone;
+  final String deliveryAddress;
+  final String? driverId;
+
+  /// Charged on top of tax and already included in [total]. Kept separately so
+  /// a receipt can show what the delivery itself cost.
+  final double deliveryFee;
+
   const CompletedPayment({
     required this.id,
     required this.orderNumber,
@@ -60,6 +72,11 @@ class CompletedPayment {
     required this.cardPaid,
     required this.change,
     required this.timestamp,
+    this.customerName = '',
+    this.customerPhone = '',
+    this.deliveryAddress = '',
+    this.driverId,
+    this.deliveryFee = 0,
   });
 
   int get totalItems => items.fold(0, (s, i) => s + i.quantity);

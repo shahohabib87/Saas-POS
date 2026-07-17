@@ -9,6 +9,8 @@ import 'package:easycasher/features/kitchen/providers/kitchen_provider.dart';
 import 'package:easycasher/features/tables/models/restaurant_table.dart';
 import 'package:easycasher/features/tables/providers/tables_provider.dart';
 import 'package:easycasher/features/payment/screens/payment_screen.dart';
+import 'package:easycasher/features/delivery/providers/delivery_provider.dart';
+import 'package:easycasher/features/delivery/widgets/delivery_details_card.dart';
 
 class CartPanel extends ConsumerWidget {
   const CartPanel({super.key});
@@ -17,6 +19,7 @@ class CartPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cartItems = ref.watch(cartProvider);
     final activeTable = ref.watch(activeTableProvider);
+    final orderType = ref.watch(orderTypeProvider);
     final tableKots = activeTable != null
         ? ref.watch(tableKotsProvider(activeTable.id))
         : <KitchenOrder>[];
@@ -26,6 +29,10 @@ class CartPanel extends ConsumerWidget {
     final discountType = ref.watch(discountTypeProvider);
     final discountValue = ref.watch(discountValueProvider);
 
+    final isDelivery = orderType == OrderType.delivery;
+    // The fee rides on the area, so it only applies to an in-house delivery.
+    final deliveryFee = isDelivery ? ref.watch(deliveryFeeProvider) : 0.0;
+
     // Bill total = all KOTs + current cart
     final kotSubtotal = tableKots.fold(0.0, (s, o) => s + o.total);
     final billSubtotal = kotSubtotal + subtotal;
@@ -34,7 +41,8 @@ class CartPanel extends ConsumerWidget {
         : discountValue.clamp(0.0, billSubtotal);
     final discountedSubtotal = billSubtotal - discountAmount;
     final billTax = discountedSubtotal * AppConstants.taxRate;
-    final billTotal = discountedSubtotal + billTax;
+    // Delivery is charged on top of tax: it is a service, not part of the food.
+    final billTotal = discountedSubtotal + billTax + deliveryFee;
 
     return Container(
       color: AppColors.surface,
@@ -42,6 +50,7 @@ class CartPanel extends ConsumerWidget {
         children: [
           const _CartHeader(),
           Container(height: 1, color: AppColors.outlineVariant),
+          if (isDelivery) const DeliveryDetailsCard(),
           Expanded(
             child: cartItems.isEmpty && !hasKots
                 ? const _EmptyCart()
@@ -76,6 +85,7 @@ class CartPanel extends ConsumerWidget {
               subtotal: billSubtotal,
               discountAmount: discountAmount,
               tax: billTax,
+              deliveryFee: deliveryFee,
               total: billTotal,
             ),
             _ActionButtons(total: billTotal, kotTotal: kotSubtotal),
@@ -525,6 +535,7 @@ class _TotalsSection extends StatelessWidget {
   final double subtotal;
   final double discountAmount;
   final double tax;
+  final double deliveryFee;
   final double total;
 
   const _TotalsSection({
@@ -532,6 +543,7 @@ class _TotalsSection extends StatelessWidget {
     required this.discountAmount,
     required this.tax,
     required this.total,
+    this.deliveryFee = 0,
   });
 
   @override
@@ -544,6 +556,12 @@ class _TotalsSection extends StatelessWidget {
             _TotalRow(label: 'Subtotal', value: subtotal),
             const SizedBox(height: 4),
             _TotalRow(label: 'Discount', value: -discountAmount, isDiscount: true),
+            const SizedBox(height: 4),
+          ],
+          // Itemised so the customer can see what they are being charged to
+          // deliver, rather than finding it buried in the total.
+          if (deliveryFee > 0) ...[
+            _TotalRow(label: 'Delivery', value: deliveryFee),
             const SizedBox(height: 4),
           ],
           _TotalRow(label: 'Total', value: total, isTotal: true),

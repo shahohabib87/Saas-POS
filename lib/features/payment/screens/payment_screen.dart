@@ -7,6 +7,7 @@ import 'package:easycasher/core/constants/app_constants.dart';
 import 'package:easycasher/features/cashier/models/cart_item.dart';
 import 'package:easycasher/features/auth/providers/auth_provider.dart';
 import 'package:easycasher/features/cashier/providers/cashier_provider.dart';
+import 'package:easycasher/features/delivery/providers/delivery_provider.dart';
 import 'package:easycasher/features/kitchen/models/kitchen_order.dart';
 import 'package:easycasher/features/kitchen/providers/kitchen_provider.dart';
 import 'package:easycasher/features/payment/models/payment.dart';
@@ -129,6 +130,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       OrderType.deliveryApp => 'Delivery App',
     };
 
+    // Only an in-house delivery carries customer and driver details; the
+    // aggregators own that information for their own orders.
+    final delivery = orderType == OrderType.delivery
+        ? ref.read(deliveryDetailsProvider)
+        : const DeliveryDetails();
+
     final payment = CompletedPayment(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       orderNumber: orderNumber,
@@ -147,6 +154,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       cardPaid: _method == PaymentMethod.card ? _total : 0,
       change: _change,
       timestamp: DateTime.now(),
+      customerName: delivery.customerName,
+      customerPhone: delivery.phone,
+      deliveryAddress: delivery.notes,
+      driverId: delivery.driverId,
+      deliveryFee: delivery.areaFee,
     );
 
     ref.read(paymentHistoryProvider.notifier).add(payment);
@@ -160,6 +172,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     ref.read(tablesProvider.notifier).setStatus(widget.table.id, TableStatus.available);
     ref.read(cartProvider.notifier).clear();
     ref.read(orderNoteProvider.notifier).state = '';
+    // The next customer is a different customer — never carry their details over.
+    ref.read(deliveryDetailsProvider.notifier).clear();
     ref.read(tableNumberProvider.notifier).state = '';
     ref.read(discountValueProvider.notifier).state = 0;
     ref.read(activeTableProvider.notifier).state = null;
