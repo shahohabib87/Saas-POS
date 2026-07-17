@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easycasher/core/api/cloud_api.dart';
 import 'package:easycasher/core/database/app_database.dart';
 import 'package:easycasher/core/database/database_provider.dart';
+import 'package:easycasher/core/entitlement/entitlement_provider.dart';
 import 'package:easycasher/features/auth/models/staff.dart';
 import 'package:easycasher/features/cashier/models/category.dart';
 import 'package:easycasher/features/cashier/models/menu_item.dart';
@@ -78,6 +79,10 @@ class _K {
   // Drivers and areas used to be cached here as raw JSON; they have real
   // tables now, alongside the customer book.
   static const deviceMode = 'cloud_device_mode';
+  // Highest server time this device has ever seen. The clock-tamper guard: the
+  // effective "now" is never allowed to fall behind it, so winding the system
+  // clock back cannot buy subscription time.
+  static const serverHighWater = 'cloud_server_high_water';
 }
 
 /// RFC-4122 v4 UUID without adding a package dependency.
@@ -139,7 +144,22 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
       lastPullAt: await _db.kvGet(_K.lastPullAt),
     );
     _startHeartbeat();
+    _refreshEntitlement(token); // pick up a renewal made while the app was closed
     flush(); // push anything queued from a previous session
+  }
+
+  /// Re-fetch the tenant's subscription state (cheap, outside the sync gate) so
+  /// a renewal reaches the device without a fresh login. Stays quiet offline.
+  Future<void> _refreshEntitlement(String token) async {
+    try {
+      final tenant =
+          await CloudApi(baseUrl: state.baseUrl, token: token).fetchMe();
+      if (tenant.isNotEmpty) {
+        await _ref.read(entitlementProvider.notifier).updateFromTenant(tenant);
+      }
+    } catch (_) {
+      // Offline or transient — the cached entitlement still governs.
+    }
   }
 
   // ── Phase 1: connect ──────────────────────────────────────────────────────
@@ -154,6 +174,11 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
       await _db.kvSet(_K.baseUrl, baseUrl);
       await _db.kvSet(_K.tenantName, session.tenantName);
       await _db.kvSet(_K.tenantSlug, session.tenantSlug);
+
+      // Capture the subscription state so entitlement can be judged offline.
+      await _ref
+          .read(entitlementProvider.notifier)
+          .updateFromTenant(session.tenantJson);
 
       state = state.copyWith(
         connected: true,
@@ -466,7 +491,13 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
       await _applyPull(res['pull'] as Map<String, dynamic>? ?? const {});
 
       final serverTime = res['server_time'] as String?;
-      if (serverTime != null) await _db.kvSet(_K.lastSyncedAt, serverTime);
+      if (serverTime != null) {
+        await _db.kvSet(_K.lastSyncedAt, serverTime);
+        // A successful sync proves the subscription is still valid — advance
+        // the clock high-water mark and re-evaluate entitlement.
+        await _advanceServerHighWater(serverTime);
+        await _ref.read(entitlementProvider.notifier).refresh();
+      }
 
       if (state.error != null) state = state.copyWith(clearError: true);
     } catch (e) {
@@ -479,10 +510,33 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
           error:
               'Cloud session expired — reconnect to keep syncing. Queued sales are safe on this device.',
         );
+      } else if (CloudApi.isPaymentRequired(e)) {
+        // Subscription lapsed. The queue is kept — those sales still belong to
+        // the tenant and must reach the server once they renew. Update the
+        // cached entitlement from the 402 body so the till locks even while it
+        // stays "connected".
+        final tenant = CloudApi.tenantFromError(e);
+        if (tenant != null) {
+          await _ref.read(entitlementProvider.notifier).updateFromTenant(tenant);
+        } else {
+          await _ref.read(entitlementProvider.notifier).refresh();
+        }
       }
       // Network errors: stay quiet, the heartbeat will retry.
     } finally {
       _flushing = false;
+    }
+  }
+
+  /// Move the server-time high-water mark forward only. The clock-tamper guard
+  /// reads this so a wound-back device clock cannot extend access.
+  Future<void> _advanceServerHighWater(String serverTimeIso) async {
+    final incoming = DateTime.tryParse(serverTimeIso);
+    if (incoming == null) return;
+    final currentRaw = await _db.kvGet(_K.serverHighWater);
+    final current = currentRaw == null ? null : DateTime.tryParse(currentRaw);
+    if (current == null || incoming.isAfter(current)) {
+      await _db.kvSet(_K.serverHighWater, incoming.toUtc().toIso8601String());
     }
   }
 

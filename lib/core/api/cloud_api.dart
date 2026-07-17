@@ -7,11 +7,16 @@ class CloudSession {
   final String tenantName;
   final String tenantSlug;
 
+  /// The raw tenant object from the server — carries the subscription status
+  /// and expiry dates the terminal needs to enforce entitlement offline.
+  final Map<String, dynamic> tenantJson;
+
   const CloudSession({
     required this.token,
     required this.userName,
     required this.tenantName,
     required this.tenantSlug,
+    this.tenantJson = const {},
   });
 }
 
@@ -56,9 +61,18 @@ class CloudApi {
       userName: (user['name'] ?? '') as String,
       tenantName: (tenant['name'] ?? '') as String,
       tenantSlug: (tenant['slug'] ?? '') as String,
+      tenantJson: tenant,
     );
     _dio.options.headers['Authorization'] = 'Bearer ${session.token}';
     return session;
+  }
+
+  /// Re-fetch the current user's tenant (subscription state included). Used on
+  /// launch to refresh entitlement without a full catalog pull.
+  Future<Map<String, dynamic>> fetchMe() async {
+    final res = await _dio.get<Map<String, dynamic>>('/me');
+    final data = res.data ?? const {};
+    return (data['tenant'] as Map<String, dynamic>?) ?? const {};
   }
 
   Future<List<dynamic>> _list(String path) async {
@@ -88,6 +102,30 @@ class CloudApi {
   /// True when the server rejected our token (expired / revoked).
   static bool isUnauthorized(Object e) =>
       e is DioException && e.response?.statusCode == 401;
+
+  /// True when the tenant's subscription has lapsed — the `subscribed` gate
+  /// answers 402 Payment Required.
+  static bool isPaymentRequired(Object e) =>
+      e is DioException && e.response?.statusCode == 402;
+
+  /// The subscription fields the 402 body carries (status + expiry dates), so
+  /// the device can update its cached entitlement the moment it's told it has
+  /// lapsed — without waiting for the next login.
+  static Map<String, dynamic>? tenantFromError(Object e) {
+    if (e is! DioException) return null;
+    final data = e.response?.data;
+    if (data is! Map) return null;
+    if (data['status'] == null &&
+        data['trial_ends_at'] == null &&
+        data['subscription_ends_at'] == null) {
+      return null;
+    }
+    return {
+      'status': data['status'],
+      'trial_ends_at': data['trial_ends_at'],
+      'subscription_ends_at': data['subscription_ends_at'],
+    };
+  }
 
   /// Human-readable message out of a Dio error (validation msg if present).
   static String errorMessage(Object e) {

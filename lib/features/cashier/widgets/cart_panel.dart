@@ -11,6 +11,8 @@ import 'package:easycasher/features/tables/providers/tables_provider.dart';
 import 'package:easycasher/features/payment/screens/payment_screen.dart';
 import 'package:easycasher/features/delivery/providers/delivery_provider.dart';
 import 'package:easycasher/features/delivery/widgets/delivery_details_card.dart';
+import 'package:easycasher/core/entitlement/entitlement.dart';
+import 'package:easycasher/core/entitlement/entitlement_provider.dart';
 
 class CartPanel extends ConsumerWidget {
   const CartPanel({super.key});
@@ -630,6 +632,11 @@ class _ActionButtons extends ConsumerWidget {
     final activeTable = ref.watch(activeTableProvider);
     final isDineIn = orderType == OrderType.dineIn && activeTable != null;
 
+    final locked = ref.watch(entitlementProvider).level == EntitlementLevel.locked;
+    // Settling a check that's already gone to the kitchen is always allowed —
+    // a lapse must never strand a seated table. Only brand-new sales stop.
+    final isSettlingOpenCheck = kotTotal > 0;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
       child: Column(
@@ -640,7 +647,9 @@ class _ActionButtons extends ConsumerWidget {
               width: double.infinity,
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: () => _sendToKitchen(context, ref),
+                onPressed: locked
+                    ? () => _blockedBySubscription(context)
+                    : () => _sendToKitchen(context, ref),
                 icon: const Icon(Icons.kitchen_rounded, size: 18),
                 label: const Text(
                   'Send to Kitchen',
@@ -699,7 +708,9 @@ class _ActionButtons extends ConsumerWidget {
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
-              onPressed: () => _confirmPay(context, ref),
+              onPressed: (locked && !isSettlingOpenCheck)
+                  ? () => _blockedBySubscription(context)
+                  : () => _confirmPay(context, ref),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -715,6 +726,18 @@ class _ActionButtons extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _blockedBySubscription(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Subscription expired — renew to start new orders. '
+          'You can still settle open checks and close the shift.',
+        ),
+        backgroundColor: AppColors.danger,
       ),
     );
   }

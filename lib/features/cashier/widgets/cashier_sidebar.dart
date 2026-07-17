@@ -7,6 +7,8 @@ import 'package:easycasher/features/auth/providers/auth_provider.dart';
 import 'package:easycasher/features/cashier/providers/cashier_provider.dart';
 import 'package:easycasher/features/kitchen/providers/kitchen_provider.dart';
 import 'package:easycasher/features/tables/providers/tables_provider.dart';
+import 'package:easycasher/core/entitlement/entitlement.dart';
+import 'package:easycasher/core/entitlement/entitlement_provider.dart';
 
 class CashierSidebar extends ConsumerWidget {
   const CashierSidebar({super.key});
@@ -50,6 +52,18 @@ class CashierSidebar extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: ElevatedButton.icon(
                 onPressed: () {
+                  // A new order is exactly what a lapsed subscription blocks.
+                  if (ref.read(entitlementProvider).level ==
+                      EntitlementLevel.locked) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                            'Subscription expired — renew to start new orders.'),
+                        backgroundColor: AppColors.danger,
+                      ),
+                    );
+                    return;
+                  }
                   ref.read(orderCounterProvider.notifier).bump();
                   ref.read(cartProvider.notifier).clear();
                   ref.read(orderNoteProvider.notifier).state = '';

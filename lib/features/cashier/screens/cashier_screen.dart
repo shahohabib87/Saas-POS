@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easycasher/core/constants/app_colors.dart';
 import 'package:easycasher/features/auth/providers/auth_provider.dart';
+import 'package:easycasher/core/entitlement/widgets/entitlement_banner.dart';
 import 'package:easycasher/features/cashier/providers/cashier_provider.dart';
 import 'package:easycasher/features/cashier/widgets/category_tab_bar.dart';
 import 'package:easycasher/features/cashier/widgets/menu_grid.dart';
@@ -32,7 +33,11 @@ class CashierScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Row(
+      body: Column(
+        children: [
+          const EntitlementBanner(),
+          Expanded(
+            child: Row(
         children: [
           const CashierSidebar(),
           Expanded(
@@ -62,6 +67,9 @@ class CashierScreen extends ConsumerWidget {
                   ],
                 ),
             },
+          ),
+        ],
+            ),
           ),
         ],
       ),
