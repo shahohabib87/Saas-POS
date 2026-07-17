@@ -22,6 +22,7 @@ class _DeliveryDetailsCardState extends ConsumerState<DeliveryDetailsCard> {
   late final TextEditingController _name;
   late final TextEditingController _notes;
   bool _expanded = true;
+  bool _recognised = false;
 
   @override
   void initState() {
@@ -38,6 +39,27 @@ class _DeliveryDetailsCardState extends ConsumerState<DeliveryDetailsCard> {
     _name.dispose();
     _notes.dispose();
     super.dispose();
+  }
+
+  /// A returning caller fills themselves in from the local book. Runs on every
+  /// keystroke because the lookup is an indexed local query — no network, no
+  /// debounce needed, and the cashier sees it land as they finish the number.
+  Future<void> _onPhoneChanged(String value) async {
+    ref.read(deliveryDetailsProvider.notifier).setPhone(value);
+
+    final areas = ref.read(deliveryAreasProvider).value ?? const [];
+    final found = await ref
+        .read(deliveryDetailsProvider.notifier)
+        .autofillFromPhone(value, areas);
+
+    if (!mounted) return;
+    // Push the filled values back into the text fields the cashier can see.
+    final d = ref.read(deliveryDetailsProvider);
+    if (_name.text != d.customerName) _name.text = d.customerName;
+    if (_notes.text != d.notes) _notes.text = d.notes;
+    if (_recognised != (found != null)) {
+      setState(() => _recognised = found != null);
+    }
   }
 
   @override
@@ -84,6 +106,8 @@ class _DeliveryDetailsCardState extends ConsumerState<DeliveryDetailsCard> {
                         ),
                       ),
                     )
+                  else if (_recognised)
+                    const _KnownCustomerChip()
                   else if (!details.isComplete)
                     const _IncompleteChip(),
                   const Spacer(),
@@ -111,7 +135,7 @@ class _DeliveryDetailsCardState extends ConsumerState<DeliveryDetailsCard> {
                     // address turns out to be wrong, so it is flagged visually
                     // until filled.
                     invalid: details.phone.trim().isEmpty,
-                    onChanged: notifier.setPhone,
+                    onChanged: _onPhoneChanged,
                   ),
                   const SizedBox(height: 8),
                   _Field(
@@ -137,6 +161,31 @@ class _DeliveryDetailsCardState extends ConsumerState<DeliveryDetailsCard> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Tells the cashier the number was recognised and the rest was filled in for
+/// them — otherwise the fields appear to populate themselves.
+class _KnownCustomerChip extends StatelessWidget {
+  const _KnownCustomerChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.success.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Text(
+        'Known customer',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          color: AppColors.success,
+        ),
       ),
     );
   }

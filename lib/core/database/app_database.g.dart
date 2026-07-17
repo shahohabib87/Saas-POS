@@ -4119,6 +4119,1050 @@ class CashMovementsCompanion extends UpdateCompanion<CashMovementRow> {
   }
 }
 
+class $DriversTable extends Drivers with TableInfo<$DriversTable, DriverRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DriversTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _phoneMeta = const VerificationMeta('phone');
+  @override
+  late final GeneratedColumn<String> phone = GeneratedColumn<String>(
+    'phone',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _activeMeta = const VerificationMeta('active');
+  @override
+  late final GeneratedColumn<bool> active = GeneratedColumn<bool>(
+    'active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, phone, active];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'drivers';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DriverRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('phone')) {
+      context.handle(
+        _phoneMeta,
+        phone.isAcceptableOrUnknown(data['phone']!, _phoneMeta),
+      );
+    }
+    if (data.containsKey('active')) {
+      context.handle(
+        _activeMeta,
+        active.isAcceptableOrUnknown(data['active']!, _activeMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DriverRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DriverRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      phone: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}phone'],
+      )!,
+      active: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}active'],
+      )!,
+    );
+  }
+
+  @override
+  $DriversTable createAlias(String alias) {
+    return $DriversTable(attachedDatabase, alias);
+  }
+}
+
+class DriverRow extends DataClass implements Insertable<DriverRow> {
+  final String id;
+  final String name;
+  final String phone;
+  final bool active;
+  const DriverRow({
+    required this.id,
+    required this.name,
+    required this.phone,
+    required this.active,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['phone'] = Variable<String>(phone);
+    map['active'] = Variable<bool>(active);
+    return map;
+  }
+
+  DriversCompanion toCompanion(bool nullToAbsent) {
+    return DriversCompanion(
+      id: Value(id),
+      name: Value(name),
+      phone: Value(phone),
+      active: Value(active),
+    );
+  }
+
+  factory DriverRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DriverRow(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      phone: serializer.fromJson<String>(json['phone']),
+      active: serializer.fromJson<bool>(json['active']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'phone': serializer.toJson<String>(phone),
+      'active': serializer.toJson<bool>(active),
+    };
+  }
+
+  DriverRow copyWith({String? id, String? name, String? phone, bool? active}) =>
+      DriverRow(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        phone: phone ?? this.phone,
+        active: active ?? this.active,
+      );
+  DriverRow copyWithCompanion(DriversCompanion data) {
+    return DriverRow(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      phone: data.phone.present ? data.phone.value : this.phone,
+      active: data.active.present ? data.active.value : this.active,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DriverRow(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('phone: $phone, ')
+          ..write('active: $active')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, phone, active);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DriverRow &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.phone == this.phone &&
+          other.active == this.active);
+}
+
+class DriversCompanion extends UpdateCompanion<DriverRow> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String> phone;
+  final Value<bool> active;
+  final Value<int> rowid;
+  const DriversCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.phone = const Value.absent(),
+    this.active = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DriversCompanion.insert({
+    required String id,
+    required String name,
+    this.phone = const Value.absent(),
+    this.active = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name);
+  static Insertable<DriverRow> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? phone,
+    Expression<bool>? active,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (phone != null) 'phone': phone,
+      if (active != null) 'active': active,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DriversCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String>? phone,
+    Value<bool>? active,
+    Value<int>? rowid,
+  }) {
+    return DriversCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      active: active ?? this.active,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (phone.present) {
+      map['phone'] = Variable<String>(phone.value);
+    }
+    if (active.present) {
+      map['active'] = Variable<bool>(active.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DriversCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('phone: $phone, ')
+          ..write('active: $active, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $DeliveryAreasTable extends DeliveryAreas
+    with TableInfo<$DeliveryAreasTable, DeliveryAreaRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DeliveryAreasTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _feeMeta = const VerificationMeta('fee');
+  @override
+  late final GeneratedColumn<double> fee = GeneratedColumn<double>(
+    'fee',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, fee];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'delivery_areas';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DeliveryAreaRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('fee')) {
+      context.handle(
+        _feeMeta,
+        fee.isAcceptableOrUnknown(data['fee']!, _feeMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DeliveryAreaRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DeliveryAreaRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      fee: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}fee'],
+      )!,
+    );
+  }
+
+  @override
+  $DeliveryAreasTable createAlias(String alias) {
+    return $DeliveryAreasTable(attachedDatabase, alias);
+  }
+}
+
+class DeliveryAreaRow extends DataClass implements Insertable<DeliveryAreaRow> {
+  final String id;
+  final String name;
+  final double fee;
+  const DeliveryAreaRow({
+    required this.id,
+    required this.name,
+    required this.fee,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['fee'] = Variable<double>(fee);
+    return map;
+  }
+
+  DeliveryAreasCompanion toCompanion(bool nullToAbsent) {
+    return DeliveryAreasCompanion(
+      id: Value(id),
+      name: Value(name),
+      fee: Value(fee),
+    );
+  }
+
+  factory DeliveryAreaRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DeliveryAreaRow(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      fee: serializer.fromJson<double>(json['fee']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'fee': serializer.toJson<double>(fee),
+    };
+  }
+
+  DeliveryAreaRow copyWith({String? id, String? name, double? fee}) =>
+      DeliveryAreaRow(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        fee: fee ?? this.fee,
+      );
+  DeliveryAreaRow copyWithCompanion(DeliveryAreasCompanion data) {
+    return DeliveryAreaRow(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      fee: data.fee.present ? data.fee.value : this.fee,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeliveryAreaRow(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('fee: $fee')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, fee);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DeliveryAreaRow &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.fee == this.fee);
+}
+
+class DeliveryAreasCompanion extends UpdateCompanion<DeliveryAreaRow> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<double> fee;
+  final Value<int> rowid;
+  const DeliveryAreasCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.fee = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DeliveryAreasCompanion.insert({
+    required String id,
+    required String name,
+    this.fee = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name);
+  static Insertable<DeliveryAreaRow> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<double>? fee,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (fee != null) 'fee': fee,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DeliveryAreasCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<double>? fee,
+    Value<int>? rowid,
+  }) {
+    return DeliveryAreasCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      fee: fee ?? this.fee,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (fee.present) {
+      map['fee'] = Variable<double>(fee.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DeliveryAreasCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('fee: $fee, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $CustomersTable extends Customers
+    with TableInfo<$CustomersTable, CustomerRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CustomersTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _phoneMeta = const VerificationMeta('phone');
+  @override
+  late final GeneratedColumn<String> phone = GeneratedColumn<String>(
+    'phone',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _areaIdMeta = const VerificationMeta('areaId');
+  @override
+  late final GeneratedColumn<String> areaId = GeneratedColumn<String>(
+    'area_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _streetMeta = const VerificationMeta('street');
+  @override
+  late final GeneratedColumn<String> street = GeneratedColumn<String>(
+    'street',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _buildingMeta = const VerificationMeta(
+    'building',
+  );
+  @override
+  late final GeneratedColumn<String> building = GeneratedColumn<String>(
+    'building',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _aptMeta = const VerificationMeta('apt');
+  @override
+  late final GeneratedColumn<String> apt = GeneratedColumn<String>(
+    'apt',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _directionsMeta = const VerificationMeta(
+    'directions',
+  );
+  @override
+  late final GeneratedColumn<String> directions = GeneratedColumn<String>(
+    'directions',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    phone,
+    name,
+    areaId,
+    street,
+    building,
+    apt,
+    directions,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'customers';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CustomerRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('phone')) {
+      context.handle(
+        _phoneMeta,
+        phone.isAcceptableOrUnknown(data['phone']!, _phoneMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_phoneMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    }
+    if (data.containsKey('area_id')) {
+      context.handle(
+        _areaIdMeta,
+        areaId.isAcceptableOrUnknown(data['area_id']!, _areaIdMeta),
+      );
+    }
+    if (data.containsKey('street')) {
+      context.handle(
+        _streetMeta,
+        street.isAcceptableOrUnknown(data['street']!, _streetMeta),
+      );
+    }
+    if (data.containsKey('building')) {
+      context.handle(
+        _buildingMeta,
+        building.isAcceptableOrUnknown(data['building']!, _buildingMeta),
+      );
+    }
+    if (data.containsKey('apt')) {
+      context.handle(
+        _aptMeta,
+        apt.isAcceptableOrUnknown(data['apt']!, _aptMeta),
+      );
+    }
+    if (data.containsKey('directions')) {
+      context.handle(
+        _directionsMeta,
+        directions.isAcceptableOrUnknown(data['directions']!, _directionsMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {phone},
+  ];
+  @override
+  CustomerRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CustomerRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      phone: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}phone'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      areaId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}area_id'],
+      ),
+      street: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}street'],
+      )!,
+      building: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}building'],
+      )!,
+      apt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}apt'],
+      )!,
+      directions: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}directions'],
+      )!,
+    );
+  }
+
+  @override
+  $CustomersTable createAlias(String alias) {
+    return $CustomersTable(attachedDatabase, alias);
+  }
+}
+
+class CustomerRow extends DataClass implements Insertable<CustomerRow> {
+  final String id;
+  final String phone;
+  final String name;
+  final String? areaId;
+  final String street;
+  final String building;
+  final String apt;
+  final String directions;
+  const CustomerRow({
+    required this.id,
+    required this.phone,
+    required this.name,
+    this.areaId,
+    required this.street,
+    required this.building,
+    required this.apt,
+    required this.directions,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['phone'] = Variable<String>(phone);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || areaId != null) {
+      map['area_id'] = Variable<String>(areaId);
+    }
+    map['street'] = Variable<String>(street);
+    map['building'] = Variable<String>(building);
+    map['apt'] = Variable<String>(apt);
+    map['directions'] = Variable<String>(directions);
+    return map;
+  }
+
+  CustomersCompanion toCompanion(bool nullToAbsent) {
+    return CustomersCompanion(
+      id: Value(id),
+      phone: Value(phone),
+      name: Value(name),
+      areaId: areaId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(areaId),
+      street: Value(street),
+      building: Value(building),
+      apt: Value(apt),
+      directions: Value(directions),
+    );
+  }
+
+  factory CustomerRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CustomerRow(
+      id: serializer.fromJson<String>(json['id']),
+      phone: serializer.fromJson<String>(json['phone']),
+      name: serializer.fromJson<String>(json['name']),
+      areaId: serializer.fromJson<String?>(json['areaId']),
+      street: serializer.fromJson<String>(json['street']),
+      building: serializer.fromJson<String>(json['building']),
+      apt: serializer.fromJson<String>(json['apt']),
+      directions: serializer.fromJson<String>(json['directions']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'phone': serializer.toJson<String>(phone),
+      'name': serializer.toJson<String>(name),
+      'areaId': serializer.toJson<String?>(areaId),
+      'street': serializer.toJson<String>(street),
+      'building': serializer.toJson<String>(building),
+      'apt': serializer.toJson<String>(apt),
+      'directions': serializer.toJson<String>(directions),
+    };
+  }
+
+  CustomerRow copyWith({
+    String? id,
+    String? phone,
+    String? name,
+    Value<String?> areaId = const Value.absent(),
+    String? street,
+    String? building,
+    String? apt,
+    String? directions,
+  }) => CustomerRow(
+    id: id ?? this.id,
+    phone: phone ?? this.phone,
+    name: name ?? this.name,
+    areaId: areaId.present ? areaId.value : this.areaId,
+    street: street ?? this.street,
+    building: building ?? this.building,
+    apt: apt ?? this.apt,
+    directions: directions ?? this.directions,
+  );
+  CustomerRow copyWithCompanion(CustomersCompanion data) {
+    return CustomerRow(
+      id: data.id.present ? data.id.value : this.id,
+      phone: data.phone.present ? data.phone.value : this.phone,
+      name: data.name.present ? data.name.value : this.name,
+      areaId: data.areaId.present ? data.areaId.value : this.areaId,
+      street: data.street.present ? data.street.value : this.street,
+      building: data.building.present ? data.building.value : this.building,
+      apt: data.apt.present ? data.apt.value : this.apt,
+      directions: data.directions.present
+          ? data.directions.value
+          : this.directions,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CustomerRow(')
+          ..write('id: $id, ')
+          ..write('phone: $phone, ')
+          ..write('name: $name, ')
+          ..write('areaId: $areaId, ')
+          ..write('street: $street, ')
+          ..write('building: $building, ')
+          ..write('apt: $apt, ')
+          ..write('directions: $directions')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, phone, name, areaId, street, building, apt, directions);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CustomerRow &&
+          other.id == this.id &&
+          other.phone == this.phone &&
+          other.name == this.name &&
+          other.areaId == this.areaId &&
+          other.street == this.street &&
+          other.building == this.building &&
+          other.apt == this.apt &&
+          other.directions == this.directions);
+}
+
+class CustomersCompanion extends UpdateCompanion<CustomerRow> {
+  final Value<String> id;
+  final Value<String> phone;
+  final Value<String> name;
+  final Value<String?> areaId;
+  final Value<String> street;
+  final Value<String> building;
+  final Value<String> apt;
+  final Value<String> directions;
+  final Value<int> rowid;
+  const CustomersCompanion({
+    this.id = const Value.absent(),
+    this.phone = const Value.absent(),
+    this.name = const Value.absent(),
+    this.areaId = const Value.absent(),
+    this.street = const Value.absent(),
+    this.building = const Value.absent(),
+    this.apt = const Value.absent(),
+    this.directions = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CustomersCompanion.insert({
+    required String id,
+    required String phone,
+    this.name = const Value.absent(),
+    this.areaId = const Value.absent(),
+    this.street = const Value.absent(),
+    this.building = const Value.absent(),
+    this.apt = const Value.absent(),
+    this.directions = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       phone = Value(phone);
+  static Insertable<CustomerRow> custom({
+    Expression<String>? id,
+    Expression<String>? phone,
+    Expression<String>? name,
+    Expression<String>? areaId,
+    Expression<String>? street,
+    Expression<String>? building,
+    Expression<String>? apt,
+    Expression<String>? directions,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (phone != null) 'phone': phone,
+      if (name != null) 'name': name,
+      if (areaId != null) 'area_id': areaId,
+      if (street != null) 'street': street,
+      if (building != null) 'building': building,
+      if (apt != null) 'apt': apt,
+      if (directions != null) 'directions': directions,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CustomersCompanion copyWith({
+    Value<String>? id,
+    Value<String>? phone,
+    Value<String>? name,
+    Value<String?>? areaId,
+    Value<String>? street,
+    Value<String>? building,
+    Value<String>? apt,
+    Value<String>? directions,
+    Value<int>? rowid,
+  }) {
+    return CustomersCompanion(
+      id: id ?? this.id,
+      phone: phone ?? this.phone,
+      name: name ?? this.name,
+      areaId: areaId ?? this.areaId,
+      street: street ?? this.street,
+      building: building ?? this.building,
+      apt: apt ?? this.apt,
+      directions: directions ?? this.directions,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (phone.present) {
+      map['phone'] = Variable<String>(phone.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (areaId.present) {
+      map['area_id'] = Variable<String>(areaId.value);
+    }
+    if (street.present) {
+      map['street'] = Variable<String>(street.value);
+    }
+    if (building.present) {
+      map['building'] = Variable<String>(building.value);
+    }
+    if (apt.present) {
+      map['apt'] = Variable<String>(apt.value);
+    }
+    if (directions.present) {
+      map['directions'] = Variable<String>(directions.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CustomersCompanion(')
+          ..write('id: $id, ')
+          ..write('phone: $phone, ')
+          ..write('name: $name, ')
+          ..write('areaId: $areaId, ')
+          ..write('street: $street, ')
+          ..write('building: $building, ')
+          ..write('apt: $apt, ')
+          ..write('directions: $directions, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -4134,6 +5178,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SettingsKvTable settingsKv = $SettingsKvTable(this);
   late final $ShiftsTable shifts = $ShiftsTable(this);
   late final $CashMovementsTable cashMovements = $CashMovementsTable(this);
+  late final $DriversTable drivers = $DriversTable(this);
+  late final $DeliveryAreasTable deliveryAreas = $DeliveryAreasTable(this);
+  late final $CustomersTable customers = $CustomersTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4149,6 +5196,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     settingsKv,
     shifts,
     cashMovements,
+    drivers,
+    deliveryAreas,
+    customers,
   ];
 }
 
@@ -6376,6 +7426,602 @@ typedef $$CashMovementsTableProcessedTableManager =
       CashMovementRow,
       PrefetchHooks Function()
     >;
+typedef $$DriversTableCreateCompanionBuilder =
+    DriversCompanion Function({
+      required String id,
+      required String name,
+      Value<String> phone,
+      Value<bool> active,
+      Value<int> rowid,
+    });
+typedef $$DriversTableUpdateCompanionBuilder =
+    DriversCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String> phone,
+      Value<bool> active,
+      Value<int> rowid,
+    });
+
+class $$DriversTableFilterComposer
+    extends Composer<_$AppDatabase, $DriversTable> {
+  $$DriversTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get phone => $composableBuilder(
+    column: $table.phone,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get active => $composableBuilder(
+    column: $table.active,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DriversTableOrderingComposer
+    extends Composer<_$AppDatabase, $DriversTable> {
+  $$DriversTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get phone => $composableBuilder(
+    column: $table.phone,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get active => $composableBuilder(
+    column: $table.active,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DriversTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DriversTable> {
+  $$DriversTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get phone =>
+      $composableBuilder(column: $table.phone, builder: (column) => column);
+
+  GeneratedColumn<bool> get active =>
+      $composableBuilder(column: $table.active, builder: (column) => column);
+}
+
+class $$DriversTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DriversTable,
+          DriverRow,
+          $$DriversTableFilterComposer,
+          $$DriversTableOrderingComposer,
+          $$DriversTableAnnotationComposer,
+          $$DriversTableCreateCompanionBuilder,
+          $$DriversTableUpdateCompanionBuilder,
+          (DriverRow, BaseReferences<_$AppDatabase, $DriversTable, DriverRow>),
+          DriverRow,
+          PrefetchHooks Function()
+        > {
+  $$DriversTableTableManager(_$AppDatabase db, $DriversTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DriversTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DriversTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DriversTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> phone = const Value.absent(),
+                Value<bool> active = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DriversCompanion(
+                id: id,
+                name: name,
+                phone: phone,
+                active: active,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<String> phone = const Value.absent(),
+                Value<bool> active = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DriversCompanion.insert(
+                id: id,
+                name: name,
+                phone: phone,
+                active: active,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DriversTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DriversTable,
+      DriverRow,
+      $$DriversTableFilterComposer,
+      $$DriversTableOrderingComposer,
+      $$DriversTableAnnotationComposer,
+      $$DriversTableCreateCompanionBuilder,
+      $$DriversTableUpdateCompanionBuilder,
+      (DriverRow, BaseReferences<_$AppDatabase, $DriversTable, DriverRow>),
+      DriverRow,
+      PrefetchHooks Function()
+    >;
+typedef $$DeliveryAreasTableCreateCompanionBuilder =
+    DeliveryAreasCompanion Function({
+      required String id,
+      required String name,
+      Value<double> fee,
+      Value<int> rowid,
+    });
+typedef $$DeliveryAreasTableUpdateCompanionBuilder =
+    DeliveryAreasCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<double> fee,
+      Value<int> rowid,
+    });
+
+class $$DeliveryAreasTableFilterComposer
+    extends Composer<_$AppDatabase, $DeliveryAreasTable> {
+  $$DeliveryAreasTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get fee => $composableBuilder(
+    column: $table.fee,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DeliveryAreasTableOrderingComposer
+    extends Composer<_$AppDatabase, $DeliveryAreasTable> {
+  $$DeliveryAreasTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get fee => $composableBuilder(
+    column: $table.fee,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DeliveryAreasTableAnnotationComposer
+    extends Composer<_$AppDatabase, $DeliveryAreasTable> {
+  $$DeliveryAreasTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<double> get fee =>
+      $composableBuilder(column: $table.fee, builder: (column) => column);
+}
+
+class $$DeliveryAreasTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $DeliveryAreasTable,
+          DeliveryAreaRow,
+          $$DeliveryAreasTableFilterComposer,
+          $$DeliveryAreasTableOrderingComposer,
+          $$DeliveryAreasTableAnnotationComposer,
+          $$DeliveryAreasTableCreateCompanionBuilder,
+          $$DeliveryAreasTableUpdateCompanionBuilder,
+          (
+            DeliveryAreaRow,
+            BaseReferences<_$AppDatabase, $DeliveryAreasTable, DeliveryAreaRow>,
+          ),
+          DeliveryAreaRow,
+          PrefetchHooks Function()
+        > {
+  $$DeliveryAreasTableTableManager(_$AppDatabase db, $DeliveryAreasTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DeliveryAreasTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DeliveryAreasTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DeliveryAreasTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<double> fee = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DeliveryAreasCompanion(
+                id: id,
+                name: name,
+                fee: fee,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<double> fee = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DeliveryAreasCompanion.insert(
+                id: id,
+                name: name,
+                fee: fee,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DeliveryAreasTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $DeliveryAreasTable,
+      DeliveryAreaRow,
+      $$DeliveryAreasTableFilterComposer,
+      $$DeliveryAreasTableOrderingComposer,
+      $$DeliveryAreasTableAnnotationComposer,
+      $$DeliveryAreasTableCreateCompanionBuilder,
+      $$DeliveryAreasTableUpdateCompanionBuilder,
+      (
+        DeliveryAreaRow,
+        BaseReferences<_$AppDatabase, $DeliveryAreasTable, DeliveryAreaRow>,
+      ),
+      DeliveryAreaRow,
+      PrefetchHooks Function()
+    >;
+typedef $$CustomersTableCreateCompanionBuilder =
+    CustomersCompanion Function({
+      required String id,
+      required String phone,
+      Value<String> name,
+      Value<String?> areaId,
+      Value<String> street,
+      Value<String> building,
+      Value<String> apt,
+      Value<String> directions,
+      Value<int> rowid,
+    });
+typedef $$CustomersTableUpdateCompanionBuilder =
+    CustomersCompanion Function({
+      Value<String> id,
+      Value<String> phone,
+      Value<String> name,
+      Value<String?> areaId,
+      Value<String> street,
+      Value<String> building,
+      Value<String> apt,
+      Value<String> directions,
+      Value<int> rowid,
+    });
+
+class $$CustomersTableFilterComposer
+    extends Composer<_$AppDatabase, $CustomersTable> {
+  $$CustomersTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get phone => $composableBuilder(
+    column: $table.phone,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get areaId => $composableBuilder(
+    column: $table.areaId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get street => $composableBuilder(
+    column: $table.street,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get building => $composableBuilder(
+    column: $table.building,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get apt => $composableBuilder(
+    column: $table.apt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get directions => $composableBuilder(
+    column: $table.directions,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CustomersTableOrderingComposer
+    extends Composer<_$AppDatabase, $CustomersTable> {
+  $$CustomersTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get phone => $composableBuilder(
+    column: $table.phone,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get areaId => $composableBuilder(
+    column: $table.areaId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get street => $composableBuilder(
+    column: $table.street,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get building => $composableBuilder(
+    column: $table.building,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get apt => $composableBuilder(
+    column: $table.apt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get directions => $composableBuilder(
+    column: $table.directions,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CustomersTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CustomersTable> {
+  $$CustomersTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get phone =>
+      $composableBuilder(column: $table.phone, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get areaId =>
+      $composableBuilder(column: $table.areaId, builder: (column) => column);
+
+  GeneratedColumn<String> get street =>
+      $composableBuilder(column: $table.street, builder: (column) => column);
+
+  GeneratedColumn<String> get building =>
+      $composableBuilder(column: $table.building, builder: (column) => column);
+
+  GeneratedColumn<String> get apt =>
+      $composableBuilder(column: $table.apt, builder: (column) => column);
+
+  GeneratedColumn<String> get directions => $composableBuilder(
+    column: $table.directions,
+    builder: (column) => column,
+  );
+}
+
+class $$CustomersTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CustomersTable,
+          CustomerRow,
+          $$CustomersTableFilterComposer,
+          $$CustomersTableOrderingComposer,
+          $$CustomersTableAnnotationComposer,
+          $$CustomersTableCreateCompanionBuilder,
+          $$CustomersTableUpdateCompanionBuilder,
+          (
+            CustomerRow,
+            BaseReferences<_$AppDatabase, $CustomersTable, CustomerRow>,
+          ),
+          CustomerRow,
+          PrefetchHooks Function()
+        > {
+  $$CustomersTableTableManager(_$AppDatabase db, $CustomersTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CustomersTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CustomersTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CustomersTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> phone = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> areaId = const Value.absent(),
+                Value<String> street = const Value.absent(),
+                Value<String> building = const Value.absent(),
+                Value<String> apt = const Value.absent(),
+                Value<String> directions = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CustomersCompanion(
+                id: id,
+                phone: phone,
+                name: name,
+                areaId: areaId,
+                street: street,
+                building: building,
+                apt: apt,
+                directions: directions,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String phone,
+                Value<String> name = const Value.absent(),
+                Value<String?> areaId = const Value.absent(),
+                Value<String> street = const Value.absent(),
+                Value<String> building = const Value.absent(),
+                Value<String> apt = const Value.absent(),
+                Value<String> directions = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CustomersCompanion.insert(
+                id: id,
+                phone: phone,
+                name: name,
+                areaId: areaId,
+                street: street,
+                building: building,
+                apt: apt,
+                directions: directions,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CustomersTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CustomersTable,
+      CustomerRow,
+      $$CustomersTableFilterComposer,
+      $$CustomersTableOrderingComposer,
+      $$CustomersTableAnnotationComposer,
+      $$CustomersTableCreateCompanionBuilder,
+      $$CustomersTableUpdateCompanionBuilder,
+      (
+        CustomerRow,
+        BaseReferences<_$AppDatabase, $CustomersTable, CustomerRow>,
+      ),
+      CustomerRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -6400,4 +8046,10 @@ class $AppDatabaseManager {
       $$ShiftsTableTableManager(_db, _db.shifts);
   $$CashMovementsTableTableManager get cashMovements =>
       $$CashMovementsTableTableManager(_db, _db.cashMovements);
+  $$DriversTableTableManager get drivers =>
+      $$DriversTableTableManager(_db, _db.drivers);
+  $$DeliveryAreasTableTableManager get deliveryAreas =>
+      $$DeliveryAreasTableTableManager(_db, _db.deliveryAreas);
+  $$CustomersTableTableManager get customers =>
+      $$CustomersTableTableManager(_db, _db.customers);
 }

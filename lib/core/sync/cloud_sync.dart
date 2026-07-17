@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:easycasher/core/api/cloud_api.dart';
@@ -74,8 +75,8 @@ class _K {
   static const lastPullAt = 'cloud_last_pull_at';
   static const lastSyncedAt = 'cloud_last_synced_at'; // server_time checkpoint
   static const outbox = 'cloud_outbox'; // JSON array of server-shape orders
-  static const drivers = 'cloud_drivers';
-  static const areas = 'cloud_delivery_areas';
+  // Drivers and areas used to be cached here as raw JSON; they have real
+  // tables now, alongside the customer book.
   static const deviceMode = 'cloud_device_mode';
 }
 
@@ -233,10 +234,15 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
     await _db.replaceTables(tables);
     if (staff.isNotEmpty) await _db.replaceStaff(staff);
 
-    // Drivers + delivery areas: no Drift tables yet — cache raw JSON
-    // (same pattern the locations feature uses).
-    await _db.kvSet(_K.drivers, jsonEncode(results[4]));
-    await _db.kvSet(_K.areas, jsonEncode(results[5]));
+    await _db.replaceDrivers(
+      results[4].map(_driverRow).whereType<DriversCompanion>().toList(),
+    );
+    await _db.replaceDeliveryAreas(
+      results[5].map(_areaRow).whereType<DeliveryAreasCompanion>().toList(),
+    );
+    // Customers are not fetched here — there is no endpoint that returns the
+    // whole book (/customers is a capped search). They arrive through the sync
+    // delta instead, which is unbounded and incremental.
 
     final now = DateTime.now().toIso8601String();
     await _db.kvSet(_K.lastPullAt, now);
@@ -338,6 +344,70 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
     await _writeOutbox(outbox);
 
     flush(); // try to deliver right away — never blocks the sale
+  }
+
+  // ── Cloud row → local row ─────────────────────────────────────────────────
+  //
+  // Laravel casts decimals to strings (`fee` is decimal:2, so it arrives as
+  // "2000.00", not 2000) and ids are uuids. Parse defensively: a single bad
+  // row must be skipped, never take the register down.
+
+  static String? _str(dynamic v) => v == null ? null : '$v';
+
+  static double _money(dynamic v) => switch (v) {
+        null => 0,
+        final num n => n.toDouble(),
+        final String s => double.tryParse(s) ?? 0,
+        _ => 0,
+      };
+
+  static bool _flag(dynamic v, {bool orElse = true}) => switch (v) {
+        null => orElse,
+        final bool b => b,
+        final num n => n != 0,
+        final String s => s == '1' || s.toLowerCase() == 'true',
+        _ => orElse,
+      };
+
+  static DriversCompanion? _driverRow(dynamic j) {
+    final id = _str(j['id']);
+    final name = _str(j['name']);
+    if (id == null || name == null) return null;
+    return DriversCompanion.insert(
+      id: id,
+      name: name,
+      phone: Value(_str(j['phone']) ?? ''),
+      active: Value(_flag(j['active'])),
+    );
+  }
+
+  static DeliveryAreasCompanion? _areaRow(dynamic j) {
+    final id = _str(j['id']);
+    final name = _str(j['name']);
+    if (id == null || name == null) return null;
+    return DeliveryAreasCompanion.insert(
+      id: id,
+      name: name,
+      fee: Value(_money(j['fee'])),
+    );
+  }
+
+  static CustomersCompanion? _customerRow(dynamic j) {
+    final id = _str(j['id']);
+    final phone = _str(j['phone']);
+    // The phone identifies the customer and carries a unique index. A row
+    // without one is unusable for lookup, which is the only reason we keep it.
+    if (id == null || phone == null || phone.isEmpty) return null;
+    return CustomersCompanion.insert(
+      id: id,
+      phone: phone,
+      name: Value(_str(j['name']) ?? ''),
+      areaId: Value(_str(j['area_id'])),
+      street: Value(_str(j['street']) ?? ''),
+      building: Value(_str(j['building']) ?? ''),
+      apt: Value(_str(j['apt']) ?? ''),
+      directions: Value(_str(j['directions']) ?? ''),
+    );
   }
 
   /// The sync endpoint validates `delivery_area_id` as a uuid and rejects the
@@ -445,6 +515,38 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
         await _db.deleteTable(j['id'] as String);
       } else {
         await _db.upsertTable(_tableFromJson(j));
+      }
+    }
+
+    for (final j in (pull['drivers'] as List?) ?? const []) {
+      changed = true;
+      final row = _driverRow(j);
+      // A driver who leaves is deactivated, not deleted — but either way they
+      // stop being assignable.
+      if (j['deleted_at'] != null || row == null) {
+        await _db.deleteDriver('${j['id']}');
+      } else {
+        await _db.upsertDriver(row);
+      }
+    }
+
+    for (final j in (pull['delivery_areas'] as List?) ?? const []) {
+      changed = true;
+      final row = _areaRow(j);
+      if (j['deleted_at'] != null || row == null) {
+        await _db.deleteDeliveryArea('${j['id']}');
+      } else {
+        await _db.upsertDeliveryArea(row);
+      }
+    }
+
+    for (final j in (pull['customers'] as List?) ?? const []) {
+      changed = true;
+      final row = _customerRow(j);
+      if (j['deleted_at'] != null || row == null) {
+        await _db.deleteCustomer('${j['id']}');
+      } else {
+        await _db.upsertCustomer(row);
       }
     }
 

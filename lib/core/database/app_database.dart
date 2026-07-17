@@ -127,6 +127,54 @@ class SettingsKv extends Table {
   Set<Column> get primaryKey => {key};
 }
 
+/// Delivery reference data and the customer book — all owned by the cloud and
+/// mirrored here so the terminal keeps working with no internet. Nothing on the
+/// terminal writes to these: the server creates customers from the delivery
+/// orders it receives (SyncController::upsertCustomer), and drivers and areas
+/// are managed in the web console.
+@DataClassName('DriverRow')
+class Drivers extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get phone => text().withDefault(const Constant(''))();
+  BoolColumn get active => boolean().withDefault(const Constant(true))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('DeliveryAreaRow')
+class DeliveryAreas extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  RealColumn get fee => real().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+@DataClassName('CustomerRow')
+class Customers extends Table {
+  TextColumn get id => text()();
+  TextColumn get phone => text()();
+  TextColumn get name => text().withDefault(const Constant(''))();
+  TextColumn get areaId => text().nullable()();
+  TextColumn get street => text().withDefault(const Constant(''))();
+  TextColumn get building => text().withDefault(const Constant(''))();
+  TextColumn get apt => text().withDefault(const Constant(''))();
+  TextColumn get directions => text().withDefault(const Constant(''))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+
+  /// The phone is how a customer is identified — the server enforces the same
+  /// uniqueness per tenant, and the lookup on every delivery needs the index.
+  @override
+  List<Set<Column>> get uniqueKeys => [
+        {phone},
+      ];
+}
+
 /// A cashier's session at the drawer: opened with a counted float, closed with
 /// a counted total. The gap between what the drawer should hold and what it
 /// actually holds is the whole point — it is how a restaurant catches theft
@@ -196,13 +244,16 @@ class ShiftTakings {
   SettingsKv,
   Shifts,
   CashMovements,
+  Drivers,
+  DeliveryAreas,
+  Customers,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting() : super(NativeDatabase.memory());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -223,13 +274,25 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(shifts);
             await m.createTable(cashMovements);
           }
+          if (from < 4) {
+            await m.createTable(drivers);
+            await m.createTable(deliveryAreas);
+            await m.createTable(customers);
+          }
         },
       );
 
   static LazyDatabase _openConnection() {
     return LazyDatabase(() async {
       final dir = await getApplicationDocumentsDirectory();
-      final file = File(p.join(dir.path, 'easycasher.db'));
+      // NOT `easycasher.db`. That name is taken by an older EasyCasher client
+      // (f:\New Shaho\All Backup\...\easycasher) which resolves the same
+      // documents path and declares schemaVersion 21 against a different
+      // schema — its `drivers` table has `status`, its `customers` has
+      // `area`/`building_name`/`floor`. Sharing the file meant both apps
+      // stamping their own user_version on it and each then "migrating" the
+      // other's database out from under it.
+      final file = File(p.join(dir.path, 'easycasher_pos.db'));
       return NativeDatabase.createInBackground(file);
     });
   }
@@ -698,6 +761,67 @@ class AppDatabase extends _$AppDatabase {
                 t.permission.equals(perm.name)))
           .go();
     }
+  }
+
+  // ── Delivery reference data (cloud-owned mirrors) ─────────────────────────
+
+  Future<List<DriverRow>> getDrivers({bool activeOnly = true}) {
+    final q = select(drivers)..orderBy([(t) => OrderingTerm.asc(t.name)]);
+    if (activeOnly) q.where((t) => t.active.equals(true));
+    return q.get();
+  }
+
+  Future<List<DeliveryAreaRow>> getDeliveryAreas() =>
+      (select(deliveryAreas)..orderBy([(t) => OrderingTerm.asc(t.name)])).get();
+
+  /// Find a customer by their exact phone. This is the whole point of keeping
+  /// the book locally: a repeat caller auto-fills with no internet.
+  Future<CustomerRow?> findCustomerByPhone(String phone) async {
+    final cleaned = phone.trim();
+    if (cleaned.isEmpty) return null;
+    final rows =
+        await (select(customers)..where((t) => t.phone.equals(cleaned))).get();
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  Future<void> upsertDriver(DriversCompanion row) =>
+      into(drivers).insertOnConflictUpdate(row);
+
+  Future<void> deleteDriver(String id) =>
+      (delete(drivers)..where((t) => t.id.equals(id))).go();
+
+  Future<void> upsertDeliveryArea(DeliveryAreasCompanion row) =>
+      into(deliveryAreas).insertOnConflictUpdate(row);
+
+  Future<void> deleteDeliveryArea(String id) =>
+      (delete(deliveryAreas)..where((t) => t.id.equals(id))).go();
+
+  /// Upsert by id, but the phone carries a unique index — a customer whose
+  /// phone was reassigned server-side would collide with the old row, so the
+  /// stale one is cleared first.
+  Future<void> upsertCustomer(CustomersCompanion row) async {
+    await (delete(customers)
+          ..where((t) =>
+              t.phone.equals(row.phone.value) & t.id.isNotValue(row.id.value)))
+        .go();
+    await into(customers).insertOnConflictUpdate(row);
+  }
+
+  Future<void> deleteCustomer(String id) =>
+      (delete(customers)..where((t) => t.id.equals(id))).go();
+
+  Future<void> replaceDrivers(List<DriversCompanion> rows) async {
+    await batch((b) {
+      b.deleteAll(drivers);
+      b.insertAll(drivers, rows);
+    });
+  }
+
+  Future<void> replaceDeliveryAreas(List<DeliveryAreasCompanion> rows) async {
+    await batch((b) {
+      b.deleteAll(deliveryAreas);
+      b.insertAll(deliveryAreas, rows);
+    });
   }
 
   // ── Shifts ────────────────────────────────────────────────────────────────

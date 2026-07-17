@@ -1,41 +1,35 @@
-import 'dart:convert';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:easycasher/core/database/app_database.dart';
 import 'package:easycasher/core/database/database_provider.dart';
 import 'package:easycasher/features/delivery/models/driver.dart';
 
-/// Drivers and delivery areas are pulled by the sync engine and cached as raw
-/// JSON under these keys (they have no Drift tables of their own yet).
-const _kDriversKey = 'cloud_drivers';
-const _kAreasKey = 'cloud_delivery_areas';
-
-List<T> _decode<T>(String? raw, T? Function(Map<String, dynamic>) parse) {
-  if (raw == null || raw.isEmpty) return const [];
-  try {
-    final list = jsonDecode(raw);
-    if (list is! List) return const [];
-    return list
-        .whereType<Map<String, dynamic>>()
-        .map(parse)
-        .whereType<T>()
-        .toList();
-  } on FormatException {
-    // Cached JSON is only ever a mirror of the server; if it is unreadable the
-    // next pull replaces it. Never take the till down over it.
-    return const [];
-  }
-}
+/// Drivers, areas and the customer book are mirrors of cloud tables, kept in
+/// SQLite so the till still takes a delivery order with no internet. Nothing
+/// here writes back: the server creates customers from the delivery orders it
+/// receives, and drivers/areas are managed in the web console.
 
 /// Drivers available to assign. Empty until the first cloud pull — a terminal
 /// that has never synced has no drivers, which is correct rather than an error.
 final driversProvider = FutureProvider<List<Driver>>((ref) async {
-  final raw = await ref.watch(appDatabaseProvider).kvGet(_kDriversKey);
-  return _decode(raw, Driver.tryFromJson).where((d) => d.active).toList();
+  final rows = await ref.watch(appDatabaseProvider).getDrivers();
+  return [
+    for (final r in rows)
+      Driver(id: r.id, name: r.name, phone: r.phone, active: r.active),
+  ];
 });
 
 final deliveryAreasProvider = FutureProvider<List<DeliveryArea>>((ref) async {
-  final raw = await ref.watch(appDatabaseProvider).kvGet(_kAreasKey);
-  return _decode(raw, DeliveryArea.tryFromJson);
+  final rows = await ref.watch(appDatabaseProvider).getDeliveryAreas();
+  return [
+    for (final r in rows) DeliveryArea(id: r.id, name: r.name, fee: r.fee),
+  ];
+});
+
+/// Look a customer up by phone. Local and indexed, so it answers instantly and
+/// works offline — which is the entire reason the book is mirrored here.
+final customerByPhoneProvider =
+    FutureProvider.family<CustomerRow?, String>((ref, phone) async {
+  return ref.watch(appDatabaseProvider).findCustomerByPhone(phone);
 });
 
 /// What the cashier captures for a delivery order, alongside the cart.
@@ -80,11 +74,14 @@ class DeliveryDetails {
 }
 
 class DeliveryDetailsNotifier extends StateNotifier<DeliveryDetails> {
-  DeliveryDetailsNotifier() : super(const DeliveryDetails());
+  final AppDatabase _db;
+
+  DeliveryDetailsNotifier(this._db) : super(const DeliveryDetails());
 
   void setPhone(String v) => state = state.copyWith(phone: v);
   void setCustomerName(String v) => state = state.copyWith(customerName: v);
   void setNotes(String v) => state = state.copyWith(notes: v);
+
   void setDriver(String? id) => state = DeliveryDetails(
         phone: state.phone,
         customerName: state.customerName,
@@ -103,12 +100,40 @@ class DeliveryDetailsNotifier extends StateNotifier<DeliveryDetails> {
         notes: state.notes,
       );
 
+  /// Fill in a returning caller from the local book. Returns the customer if
+  /// one was found, so the UI can say so.
+  ///
+  /// Only ever fills blanks — a cashier who has already typed something is
+  /// correcting the record, and a stale mirror must not overwrite them.
+  Future<CustomerRow?> autofillFromPhone(
+    String phone,
+    List<DeliveryArea> areas,
+  ) async {
+    final customer = await _db.findCustomerByPhone(phone);
+    if (customer == null) return null;
+
+    final area = customer.areaId == null
+        ? null
+        : areas.where((a) => a.id == customer.areaId).firstOrNull;
+
+    state = DeliveryDetails(
+      phone: state.phone,
+      customerName:
+          state.customerName.isEmpty ? customer.name : state.customerName,
+      driverId: state.driverId,
+      areaId: state.areaId ?? area?.id,
+      areaFee: state.areaId == null ? (area?.fee ?? 0) : state.areaFee,
+      notes: state.notes.isEmpty ? customer.directions : state.notes,
+    );
+    return customer;
+  }
+
   void clear() => state = const DeliveryDetails();
 }
 
 final deliveryDetailsProvider =
     StateNotifierProvider<DeliveryDetailsNotifier, DeliveryDetails>(
-  (ref) => DeliveryDetailsNotifier(),
+  (ref) => DeliveryDetailsNotifier(ref.watch(appDatabaseProvider)),
 );
 
 /// The delivery fee currently applying to the cart — zero unless the order is
