@@ -286,6 +286,7 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
       'discount_amount': p.discountAmount,
       'tax': p.tax,
       'tip': p.tip,
+      'delivery_fee': p.deliveryFee,
       'total': p.total,
       'method': p.method.name,
       'cash_paid': p.cashPaid,
@@ -294,14 +295,19 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
       'status': 'completed',
       'note': null,
       'placed_at': placedAt,
-      // Delivery details — the server has customer_name/phone/delivery_address
-      // and orders.driver_id. Sent for every order type; they are empty unless
-      // this was an in-house delivery.
+      // Delivery details. Field names must match SyncController::ORDER_FIELDS
+      // exactly — it filters with Arr::only(), so a wrong key is dropped in
+      // silence rather than rejected. `customer_phone` in particular also gates
+      // the customer upsert: get it wrong and no customer is ever created.
       'customer_name': p.customerName.isEmpty ? null : p.customerName,
-      'phone': p.customerPhone.isEmpty ? null : p.customerPhone,
-      'delivery_address':
-          p.deliveryAddress.isEmpty ? null : p.deliveryAddress,
+      'customer_phone': p.customerPhone.isEmpty ? null : p.customerPhone,
+      'delivery_notes': p.deliveryNotes.isEmpty ? null : p.deliveryNotes,
       'driver_id': p.driverId,
+      // Not an order column — the server reads it to set the customer's area.
+      // It is validated as `nullable|uuid`, and a 422 fails the whole batch,
+      // so anything that isn't a uuid is sent as null rather than wedging the
+      // outbox for every other queued sale.
+      'delivery_area_id': _uuidOrNull(p.deliveryAreaId),
       'kots': [
         {
           'id': kotId,
@@ -333,6 +339,19 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
 
     flush(); // try to deliver right away — never blocks the sale
   }
+
+  /// The sync endpoint validates `delivery_area_id` as a uuid and rejects the
+  /// entire push otherwise — one malformed id would strand every queued sale
+  /// behind it. Losing the area on one order is survivable; losing the queue
+  /// is not.
+  static String? _uuidOrNull(String? v) {
+    if (v == null || v.isEmpty) return null;
+    return _uuidPattern.hasMatch(v) ? v : null;
+  }
+
+  static final _uuidPattern = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
 
   String _serverOrderType(String label) => switch (label) {
         'Dine-In' => 'dine_in',

@@ -156,8 +156,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       timestamp: DateTime.now(),
       customerName: delivery.customerName,
       customerPhone: delivery.phone,
-      deliveryAddress: delivery.notes,
+      deliveryNotes: delivery.notes,
       driverId: delivery.driverId,
+      deliveryAreaId: delivery.areaId,
       deliveryFee: delivery.areaFee,
     );
 

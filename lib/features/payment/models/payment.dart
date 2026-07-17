@@ -43,15 +43,24 @@ class CompletedPayment {
   final DateTime timestamp;
 
   // Delivery info — empty for every other order type. Captured at the till
-  // because the driver needs it, and the cloud stores it on the order
-  // (customer_name / phone / delivery_address / driver_id).
+  // because the driver needs it, and because the server builds the customer
+  // book from it: SyncController upserts a Customer by customer_phone on every
+  // delivery order, so this is the only way a customer is ever created.
   final String customerName;
   final String customerPhone;
-  final String deliveryAddress;
+
+  /// Landmark / street / floor. Maps to the server's `delivery_notes`, which
+  /// seeds `Customer.directions` the first time we see this phone.
+  final String deliveryNotes;
+
   final String? driverId;
 
-  /// Charged on top of tax and already included in [total]. Kept separately so
-  /// a receipt can show what the delivery itself cost.
+  /// Not stored on the order server-side — it is what tells the customer
+  /// upsert which area this person lives in. Must be a uuid or null.
+  final String? deliveryAreaId;
+
+  /// Charged on top of tax and already included in [total]. Sent separately
+  /// too: `orders.delivery_fee` is a real column, and the receipt itemises it.
   final double deliveryFee;
 
   const CompletedPayment({
@@ -74,8 +83,9 @@ class CompletedPayment {
     required this.timestamp,
     this.customerName = '',
     this.customerPhone = '',
-    this.deliveryAddress = '',
+    this.deliveryNotes = '',
     this.driverId,
+    this.deliveryAreaId,
     this.deliveryFee = 0,
   });
 
