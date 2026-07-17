@@ -548,11 +548,59 @@ class AppDatabase extends _$AppDatabase {
       for (final role in StaffRole.values) role: {},
     };
     for (final row in rows) {
-      final role = StaffRole.values.byName(row.role);
-      final perm = AppPermission.values.byName(row.permission);
+      // Rows can outlive the enums: a retired permission, or one a newer
+      // server knows about and this build doesn't. Skip rather than throw —
+      // an unknown string here must not brick login.
+      final role = StaffRole.values.asNameMap()[row.role];
+      final perm = AppPermission.values.asNameMap()[row.permission];
+      if (role == null || perm == null) continue;
       result[role]!.add(perm);
     }
     return result;
+  }
+
+  /// Reconcile the stored permission matrix with the current [AppPermission]
+  /// enum.
+  ///
+  /// `seedIfEmpty` only ever runs once, so an app that has already been opened
+  /// keeps whatever matrix it was seeded with: rows naming permissions this
+  /// build has retired, and no rows at all for ones it has introduced. Without
+  /// this, upgrading terminals would silently never show the new screens.
+  ///
+  /// Deliberately additive — it grants only the permissions [introduced] by
+  /// this build. Any other absent default is left absent, because the tenant
+  /// may have revoked it on purpose.
+  Future<void> reconcileRolePermissions() async {
+    const marker = '_perms_reconciled_v2';
+    if (await _getSetting(marker) == '1') return;
+
+    const introduced = {
+      AppPermission.onlineOrders,
+      AppPermission.dispatch,
+      AppPermission.shift,
+    };
+
+    final valid = AppPermission.values.map((p) => p.name).toSet();
+
+    for (final row in await select(rolePerms).get()) {
+      if (valid.contains(row.permission)) continue;
+      await (delete(rolePerms)
+            ..where((t) =>
+                t.role.equals(row.role) &
+                t.permission.equals(row.permission)))
+          .go();
+    }
+
+    for (final entry in kDefaultRolePermissions.entries) {
+      for (final perm in entry.value.where(introduced.contains)) {
+        await into(rolePerms).insertOnConflictUpdate(RolePermsCompanion(
+          role: Value(entry.key.name),
+          permission: Value(perm.name),
+        ));
+      }
+    }
+
+    await _setSetting(marker, '1');
   }
 
   Future<void> setRolePermission(

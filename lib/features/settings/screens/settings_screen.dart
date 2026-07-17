@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easycasher/core/constants/app_colors.dart';
 import 'package:easycasher/features/auth/models/app_permission.dart';
@@ -10,10 +9,10 @@ import 'package:easycasher/features/locations/providers/locations_provider.dart'
 import 'package:easycasher/features/settings/models/app_settings.dart';
 import 'package:easycasher/features/settings/providers/settings_provider.dart';
 import 'package:easycasher/core/sync/cloud_sync.dart';
-import 'package:easycasher/features/tables/models/restaurant_table.dart';
-import 'package:easycasher/features/tables/providers/tables_provider.dart';
 
-enum _Section { restaurant, serviceMode, tax, receipt, staff, tables, locations, permissions, cloud }
+/// Table records are created and edited in the web console, not here — the
+/// terminal only seats and moves the tables the cloud sends down.
+enum _Section { restaurant, serviceMode, tax, receipt, staff, locations, permissions, cloud }
 
 extension _SectionX on _Section {
   String get label => switch (this) {
@@ -22,7 +21,6 @@ extension _SectionX on _Section {
         _Section.tax         => 'Tax',
         _Section.receipt     => 'Receipt',
         _Section.staff       => 'Staff',
-        _Section.tables      => 'Tables',
         _Section.locations   => 'Locations',
         _Section.permissions => 'Permissions',
         _Section.cloud       => 'Cloud Sync',
@@ -33,7 +31,6 @@ extension _SectionX on _Section {
         _Section.tax         => Icons.percent_rounded,
         _Section.receipt     => Icons.receipt_long_rounded,
         _Section.staff       => Icons.people_rounded,
-        _Section.tables      => Icons.table_restaurant_rounded,
         _Section.locations   => Icons.location_on_rounded,
         _Section.permissions => Icons.shield_rounded,
         _Section.cloud       => Icons.cloud_rounded,
@@ -82,14 +79,11 @@ class _SettingsNav extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final staff       = ref.watch(currentStaffProvider);
-    final permissions = ref.watch(currentPermissionsProvider);
-    final isAdmin     = staff?.role == StaffRole.admin;
-    final canManageTables = permissions.contains(AppPermission.tableManagement);
+    final staff = ref.watch(currentStaffProvider);
+    final isAdmin = staff?.role == StaffRole.admin;
 
     final visible = _Section.values.where((s) {
       if (s == _Section.permissions) return isAdmin;
-      if (s == _Section.tables) return canManageTables;
       return true;
     }).toList();
 
@@ -208,7 +202,6 @@ class _SectionContent extends ConsumerWidget {
         _Section.tax         => _TaxSection(settings: settings),
         _Section.receipt     => _ReceiptSection(settings: settings),
         _Section.staff       => const _StaffSection(),
-        _Section.tables      => const _TablesSection(),
         _Section.locations   => const _LocationsSection(),
         _Section.permissions => const _PermissionsSection(),
         _Section.cloud       => const _CloudSection(),
@@ -1325,344 +1318,6 @@ class _PermissionTile extends StatelessWidget {
     );
   }
 }
-
-// ─── Tables section ───────────────────────────────────────────────────────────
-
-class _TablesSection extends ConsumerWidget {
-  const _TablesSection();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tables = ref.watch(tablesProvider);
-
-    return _SectionShell(
-      title: 'Tables',
-      subtitle: 'Add, edit, or remove dining tables',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Spacer(),
-              ElevatedButton.icon(
-                onPressed: () => _showDialog(context, ref, null),
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: const Text('Add Table'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                  elevation: 0,
-                  textStyle: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _Card(
-            child: tables.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(
-                      child: Text(
-                        'No tables yet. Tap "Add Table" to get started.',
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: AppColors.onSurfaceVariant),
-                      ),
-                    ),
-                  )
-                : Column(
-                    children: [
-                      for (int i = 0; i < tables.length; i++) ...[
-                        if (i > 0)
-                          const Divider(
-                              height: 1, color: AppColors.outlineVariant),
-                        _TableRow(
-                          table: tables[i],
-                          onEdit: () => _showDialog(context, ref, tables[i]),
-                          onDelete: () =>
-                              _confirmDelete(context, ref, tables[i]),
-                        ),
-                      ],
-                    ],
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDialog(BuildContext context, WidgetRef ref, RestaurantTable? existing) {
-    showDialog(
-      context: context,
-      builder: (_) => _TableDialog(
-        existing: existing,
-        suggestedNumber:
-            ref.read(tablesProvider.notifier).nextSuggestedNumber(),
-        onSave: (number, capacity) {
-          if (existing == null) {
-            ref.read(tablesProvider.notifier).add(number, capacity);
-          } else {
-            ref
-                .read(tablesProvider.notifier)
-                .update(existing.id, number: number, capacity: capacity);
-          }
-        },
-      ),
-    );
-  }
-
-  void _confirmDelete(
-      BuildContext context, WidgetRef ref, RestaurantTable table) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: const Text('Delete Table?',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-        content: Text(
-          'Remove Table ${table.number}? This cannot be undone.',
-          style: const TextStyle(
-              fontSize: 13, color: AppColors.onSurfaceVariant),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () {
-              ref.read(tablesProvider.notifier).remove(table.id);
-              Navigator.pop(ctx);
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TableRow extends StatelessWidget {
-  final RestaurantTable table;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  const _TableRow(
-      {required this.table, required this.onEdit, required this.onDelete});
-
-  Color get _statusColor => switch (table.status) {
-        TableStatus.available => AppColors.success,
-        TableStatus.occupied  => AppColors.warning,
-        TableStatus.reserved  => AppColors.outline,
-      };
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: _statusColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.table_restaurant_rounded,
-                color: _statusColor, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Table ${table.number}',
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.onSurface)),
-                const SizedBox(height: 2),
-                Text('${table.capacity} seats  •  ${table.status.name}',
-                    style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.onSurfaceVariant)),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.edit_rounded,
-                size: 18, color: AppColors.onSurfaceVariant),
-            onPressed: onEdit,
-            tooltip: 'Edit',
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline_rounded,
-                size: 18, color: AppColors.danger),
-            onPressed: table.status == TableStatus.occupied ? null : onDelete,
-            tooltip: table.status == TableStatus.occupied
-                ? 'Cannot delete occupied table'
-                : 'Delete',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TableDialog extends StatefulWidget {
-  final RestaurantTable? existing;
-  final int suggestedNumber;
-  final void Function(int number, int capacity) onSave;
-
-  const _TableDialog({
-    required this.existing,
-    required this.suggestedNumber,
-    required this.onSave,
-  });
-
-  @override
-  State<_TableDialog> createState() => _TableDialogState();
-}
-
-class _TableDialogState extends State<_TableDialog> {
-  late final TextEditingController _number;
-  late int _capacity;
-
-  static const _capacities = [2, 4, 6, 8, 10, 12];
-
-  @override
-  void initState() {
-    super.initState();
-    _number = TextEditingController(
-      text: (widget.existing?.number ?? widget.suggestedNumber).toString(),
-    );
-    _capacity = widget.existing?.capacity ?? 4;
-    if (!_capacities.contains(_capacity)) _capacity = 4;
-  }
-
-  @override
-  void dispose() {
-    _number.dispose();
-    super.dispose();
-  }
-
-  void _save() {
-    final number = int.tryParse(_number.text.trim());
-    if (number == null || number < 1) return;
-    widget.onSave(number, _capacity);
-    Navigator.pop(context);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isEdit = widget.existing != null;
-    return Dialog(
-      backgroundColor: AppColors.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: SizedBox(
-        width: 340,
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                isEdit ? 'Edit Table' : 'Add Table',
-                style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.onSurface),
-              ),
-              const SizedBox(height: 20),
-              const _FieldLabel('TABLE NUMBER'),
-              const SizedBox(height: 6),
-              TextField(
-                controller: _number,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: _inputDec('e.g. 1'),
-                style: const TextStyle(fontSize: 14),
-              ),
-              const SizedBox(height: 16),
-              const _FieldLabel('CAPACITY (SEATS)'),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: _capacities.map((c) {
-                  final sel = c == _capacity;
-                  return GestureDetector(
-                    onTap: () => setState(() => _capacity = c),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 120),
-                      width: 52,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: sel ? AppColors.primary : AppColors.surfaceLow,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: sel
-                              ? AppColors.primary
-                              : AppColors.outlineVariant,
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        '$c',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: sel ? Colors.white : AppColors.onSurface,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
-                    ),
-                    onPressed: _save,
-                    child: Text(isEdit ? 'Save' : 'Add Table'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Locations section (delivery neighbourhoods) ─────────────────────────────
 
 class _LocationsSection extends ConsumerWidget {
   const _LocationsSection();

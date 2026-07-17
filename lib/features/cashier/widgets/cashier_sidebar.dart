@@ -18,20 +18,21 @@ class CashierSidebar extends ConsumerWidget {
     final pendingKots  = ref.watch(pendingKotCountProvider);
     final permissions  = ref.watch(currentPermissionsProvider);
 
-    final showTables      = permissions.contains(AppPermission.tables);
-    final showTakeout     = permissions.contains(AppPermission.takeout);
-    final showDelivery    = permissions.contains(AppPermission.delivery);
-    final showDeliveryApp = permissions.contains(AppPermission.deliveryApp);
-    final showOrders      = permissions.contains(AppPermission.orders);
-    final showKds         = permissions.contains(AppPermission.kitchenDisplay);
-    final showTalabat     = permissions.contains(AppPermission.talabat);
-    final showDeliveryScr = permissions.contains(AppPermission.deliveryScreen);
-    final showSettings    = permissions.contains(AppPermission.settings);
-    final showMenu        = permissions.contains(AppPermission.menuManagement);
-    final showReports     = permissions.contains(AppPermission.reports);
+    final showTables       = permissions.contains(AppPermission.tables);
+    final showTakeout      = permissions.contains(AppPermission.takeout);
+    final showDelivery     = permissions.contains(AppPermission.delivery);
+    final showOrders       = permissions.contains(AppPermission.orders);
+    final showOnlineOrders = permissions.contains(AppPermission.onlineOrders);
+    final showKds          = permissions.contains(AppPermission.kitchenDisplay);
+    final showDispatch     = permissions.contains(AppPermission.dispatch);
+    final showSettings     = permissions.contains(AppPermission.settings);
 
-    final hasOrderTypes = showTables || showTakeout || showDelivery || showDeliveryApp;
-    final hasScreens    = showOrders || showKds || showTalabat || showDeliveryScr || showSettings || showMenu || showReports;
+    final hasOrderTypes = showTables || showTakeout || showDelivery;
+    final hasScreens = showOrders ||
+        showOnlineOrders ||
+        showKds ||
+        showDispatch ||
+        showSettings;
 
     return Container(
       width: 220,
@@ -103,13 +104,6 @@ class CashierSidebar extends ConsumerWidget {
                 type: OrderType.delivery,
                 selected: orderType,
               ),
-            if (showDeliveryApp)
-              _NavItem(
-                icon: Icons.phone_android_rounded,
-                label: 'Delivery App',
-                type: OrderType.deliveryApp,
-                selected: orderType,
-              ),
           ],
           // SCREENS section
           if (hasScreens) ...[
@@ -135,6 +129,14 @@ class CashierSidebar extends ConsumerWidget {
                 view: AppView.orders,
                 selected: appView,
               ),
+            if (showOnlineOrders)
+              _ViewNavItem(
+                icon: Icons.language_rounded,
+                label: 'Online Orders',
+                badge: 0,
+                view: AppView.onlineOrders,
+                selected: appView,
+              ),
             if (showKds)
               _ViewNavItem(
                 icon: Icons.kitchen_rounded,
@@ -143,36 +145,12 @@ class CashierSidebar extends ConsumerWidget {
                 view: AppView.kds,
                 selected: appView,
               ),
-            if (showTalabat)
+            if (showDispatch)
               _ViewNavItem(
-                icon: Icons.delivery_dining_rounded,
-                label: 'Talabat',
+                icon: Icons.moped_rounded,
+                label: 'Dispatch',
                 badge: 0,
-                view: AppView.talabat,
-                selected: appView,
-              ),
-            if (showDeliveryScr)
-              _ViewNavItem(
-                icon: Icons.delivery_dining_rounded,
-                label: 'Delivery',
-                badge: 0,
-                view: AppView.delivery,
-                selected: appView,
-              ),
-            if (showMenu)
-              _ViewNavItem(
-                icon: Icons.restaurant_menu_rounded,
-                label: 'Menu',
-                badge: 0,
-                view: AppView.menu,
-                selected: appView,
-              ),
-            if (showReports)
-              _ViewNavItem(
-                icon: Icons.bar_chart_rounded,
-                label: 'Reports',
-                badge: 0,
-                view: AppView.reports,
+                view: AppView.dispatch,
                 selected: appView,
               ),
             if (showSettings)

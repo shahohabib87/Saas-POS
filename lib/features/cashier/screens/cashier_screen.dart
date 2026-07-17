@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easycasher/core/constants/app_colors.dart';
+import 'package:easycasher/features/auth/providers/auth_provider.dart';
 import 'package:easycasher/features/cashier/providers/cashier_provider.dart';
 import 'package:easycasher/features/cashier/widgets/category_tab_bar.dart';
 import 'package:easycasher/features/cashier/widgets/menu_grid.dart';
@@ -9,10 +10,8 @@ import 'package:easycasher/features/cashier/widgets/cashier_sidebar.dart';
 import 'package:easycasher/features/cashier/widgets/cashier_search_bar.dart';
 import 'package:easycasher/features/kitchen/screens/kds_screen.dart';
 import 'package:easycasher/features/orders/screens/orders_screen.dart';
-import 'package:easycasher/features/delivery/screens/delivery_screen.dart';
-import 'package:easycasher/features/delivery/screens/delivery_apps_screen.dart';
-import 'package:easycasher/features/menu/screens/menu_screen.dart';
-import 'package:easycasher/features/reports/screens/reports_screen.dart';
+import 'package:easycasher/features/delivery/screens/dispatch_screen.dart';
+import 'package:easycasher/features/online_orders/screens/online_orders_screen.dart';
 import 'package:easycasher/features/settings/screens/settings_screen.dart';
 import 'package:easycasher/features/tables/providers/tables_provider.dart';
 import 'package:easycasher/features/tables/screens/tables_screen.dart';
@@ -26,15 +25,8 @@ class CashierScreen extends ConsumerWidget {
     final activeTable = ref.watch(activeTableProvider);
     final appView = ref.watch(appViewProvider);
 
-    final showKds      = appView == AppView.kds;
-    final showOrders   = appView == AppView.orders;
-    final showDelivery = appView == AppView.delivery;
-    final showTalabat  = appView == AppView.talabat;
-    final showSettings = appView == AppView.settings;
-    final showMenu     = appView == AppView.menu;
-    final showReports  = appView == AppView.reports;
+    // Dine-in with no table picked yet shows the floor plan instead of the till.
     final showTablesMap =
-        !showKds && !showOrders && !showDelivery && !showTalabat && !showSettings && !showMenu && !showReports &&
         orderType == OrderType.dineIn && activeTable == null;
 
     return Scaffold(
@@ -43,38 +35,31 @@ class CashierScreen extends ConsumerWidget {
         children: [
           const CashierSidebar(),
           Expanded(
-            child: showKds
-                ? const KdsScreen()
-                : showOrders
-                    ? const OrdersScreen()
-                    : showDelivery
-                        ? const DeliveryScreen()
-                        : showTalabat
-                            ? const DeliveryAppsScreen()
-                            : showSettings
-                                ? const SettingsScreen()
-                                : showReports
-                                    ? const ReportsScreen()
-                                    : showMenu
-                                    ? const MenuScreen()
-                                    : Column(
-                                    children: [
-                                      const _TopHeader(),
-                                      Expanded(
-                                        child: showTablesMap
-                                            ? const TablesScreen()
-                                            : const Row(
-                                                children: [
-                                                  Expanded(child: _MenuSection()),
-                                                  _VerticalDivider(),
-                                                  SizedBox(
-                                                      width: 380,
-                                                      child: CartPanel()),
-                                                ],
-                                              ),
-                                      ),
-                                    ],
-                                  ),
+            child: switch (appView) {
+              AppView.kds          => const KdsScreen(),
+              AppView.orders       => const OrdersScreen(),
+              AppView.onlineOrders => const OnlineOrdersScreen(),
+              AppView.dispatch     => const DispatchScreen(),
+              AppView.settings     => const SettingsScreen(),
+              AppView.pos => Column(
+                  children: [
+                    _TopHeader(
+                      title: showTablesMap ? 'Tables' : 'Menu',
+                    ),
+                    Expanded(
+                      child: showTablesMap
+                          ? const TablesScreen()
+                          : const Row(
+                              children: [
+                                Expanded(child: _MenuSection()),
+                                _VerticalDivider(),
+                                SizedBox(width: 380, child: CartPanel()),
+                              ],
+                            ),
+                    ),
+                  ],
+                ),
+            },
           ),
         ],
       ),
@@ -111,11 +96,13 @@ class _VerticalDivider extends StatelessWidget {
 }
 
 class _TopHeader extends ConsumerWidget {
-  const _TopHeader();
+  final String title;
+  const _TopHeader({required this.title});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cartCount = ref.watch(cartCountProvider);
+    final staff = ref.watch(currentStaffProvider);
 
     return Container(
       height: 60,
@@ -128,9 +115,9 @@ class _TopHeader extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          const Text(
-            'Menu',
-            style: TextStyle(
+          Text(
+            title,
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: AppColors.onSurface,
@@ -162,18 +149,18 @@ class _TopHeader extends ConsumerWidget {
               color: AppColors.surfaceLow,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                CircleAvatar(
+                const CircleAvatar(
                   radius: 12,
                   backgroundColor: AppColors.primaryFixed,
                   child: Icon(Icons.person_rounded,
                       size: 14, color: AppColors.primary),
                 ),
-                SizedBox(width: 6),
+                const SizedBox(width: 6),
                 Text(
-                  'Cashier',
-                  style: TextStyle(
+                  staff?.name ?? 'Signed out',
+                  style: const TextStyle(
                     fontSize: 13,
                     color: AppColors.onSurface,
                     fontWeight: FontWeight.w500,

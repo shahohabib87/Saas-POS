@@ -2,9 +2,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easycasher/core/database/app_database.dart';
 import 'package:easycasher/core/database/database_provider.dart';
 
+/// How an order reaches us. `deliveryApp` is no longer offered as a till
+/// button — those orders arrive from the aggregators — but the value stays:
+/// it is persisted on past orders and is part of the `/api/sync` contract
+/// (see cloud_sync.dart, which maps it to `delivery_app`).
 enum OrderType { dineIn, takeaway, delivery, deliveryApp }
 
-enum AppView { pos, orders, kds, delivery, talabat, settings, menu, reports }
+/// Screens this terminal can show. Menu and Reports intentionally absent —
+/// they live in the web console now.
+enum AppView { pos, orders, onlineOrders, kds, dispatch, settings }
 
 final orderTypeProvider =
     StateProvider<OrderType>((ref) => OrderType.dineIn);

@@ -1,18 +1,22 @@
 import 'package:easycasher/features/auth/models/staff.dart';
 
+/// What a staff member may do *on this terminal*.
+///
+/// The terminal only operates — it never manages. Catalog, staff, table and
+/// driver records, reporting and business settings live in the web console,
+/// so there are deliberately no `*Management` permissions here. Retired
+/// values (menuManagement, tableManagement, reports) may still exist in old
+/// `role_perms` rows; `getRolePermissions()` skips names it doesn't know.
 enum AppPermission {
   tables,
   takeout,
   delivery,
-  deliveryApp,
   orders,
+  onlineOrders,
   kitchenDisplay,
-  talabat,
-  deliveryScreen,
+  dispatch,
+  shift,
   settings,
-  menuManagement,
-  tableManagement,
-  reports,
 }
 
 extension AppPermissionX on AppPermission {
@@ -20,30 +24,24 @@ extension AppPermissionX on AppPermission {
         AppPermission.tables         => 'Tables',
         AppPermission.takeout        => 'Takeout',
         AppPermission.delivery       => 'Delivery (Order Type)',
-        AppPermission.deliveryApp    => 'Delivery App',
         AppPermission.orders         => 'Orders',
+        AppPermission.onlineOrders   => 'Online Orders',
         AppPermission.kitchenDisplay => 'Kitchen Display',
-        AppPermission.talabat        => 'Talabat',
-        AppPermission.deliveryScreen => 'Delivery Screen',
-        AppPermission.settings        => 'Settings',
-        AppPermission.menuManagement  => 'Menu Management',
-        AppPermission.tableManagement => 'Table Management',
-        AppPermission.reports         => 'Reports',
+        AppPermission.dispatch       => 'Dispatch',
+        AppPermission.shift          => 'Shift',
+        AppPermission.settings       => 'Device Settings',
       };
 
   String get description => switch (this) {
         AppPermission.tables         => 'Access dine-in table management',
         AppPermission.takeout        => 'Create and manage takeout orders',
         AppPermission.delivery       => 'Manage in-house delivery orders',
-        AppPermission.deliveryApp    => 'Handle third-party delivery app orders',
         AppPermission.orders         => 'View all orders list',
+        AppPermission.onlineOrders   => 'Accept and reject incoming online orders',
         AppPermission.kitchenDisplay => 'View the kitchen display screen',
-        AppPermission.talabat        => 'Manage Talabat integration',
-        AppPermission.deliveryScreen => 'View delivery management screen',
-        AppPermission.settings       => 'Access app settings',
-        AppPermission.menuManagement  => 'Add, edit, and delete menu items',
-        AppPermission.tableManagement => 'Add, edit, and delete tables',
-        AppPermission.reports         => 'View sales reports and analytics',
+        AppPermission.dispatch       => 'Assign drivers and dispatch deliveries',
+        AppPermission.shift          => 'Open and close shifts, count the drawer',
+        AppPermission.settings       => 'Change this device\'s settings',
       };
 }
 
@@ -52,36 +50,31 @@ const kDefaultRolePermissions = <StaffRole, Set<AppPermission>>{
     AppPermission.tables,
     AppPermission.takeout,
     AppPermission.delivery,
-    AppPermission.deliveryApp,
     AppPermission.orders,
+    AppPermission.onlineOrders,
     AppPermission.kitchenDisplay,
-    AppPermission.talabat,
-    AppPermission.deliveryScreen,
+    AppPermission.dispatch,
+    AppPermission.shift,
     AppPermission.settings,
-    AppPermission.menuManagement,
-    AppPermission.tableManagement,
-    AppPermission.reports,
   },
   StaffRole.manager: {
     AppPermission.tables,
     AppPermission.takeout,
     AppPermission.delivery,
-    AppPermission.deliveryApp,
     AppPermission.orders,
+    AppPermission.onlineOrders,
     AppPermission.kitchenDisplay,
-    AppPermission.talabat,
-    AppPermission.deliveryScreen,
+    AppPermission.dispatch,
+    AppPermission.shift,
     AppPermission.settings,
-    AppPermission.menuManagement,
-    AppPermission.tableManagement,
-    AppPermission.reports,
   },
   StaffRole.cashier: {
     AppPermission.tables,
     AppPermission.takeout,
     AppPermission.delivery,
-    AppPermission.deliveryApp,
     AppPermission.orders,
+    AppPermission.onlineOrders,
+    AppPermission.shift,
     AppPermission.settings,
   },
   StaffRole.waiter: {

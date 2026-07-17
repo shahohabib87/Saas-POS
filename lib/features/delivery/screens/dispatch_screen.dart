@@ -15,8 +15,12 @@ extension _DeliveryTabX on _DeliveryTab {
 final _deliveryTabProvider =
     StateProvider<_DeliveryTab>((_) => _DeliveryTab.active);
 
-class DeliveryScreen extends ConsumerWidget {
-  const DeliveryScreen({super.key});
+/// In-house delivery dispatch: assign a driver, send them out, mark delivered.
+///
+/// Driver records, delivery areas and settlement live in the web console —
+/// this screen only operates on what the cloud sends down.
+class DispatchScreen extends ConsumerWidget {
+  const DispatchScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -50,7 +54,7 @@ class _DeliveryHeader extends ConsumerWidget {
       child: Row(
         children: [
           const Text(
-            'Delivery Orders',
+            'Dispatch',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,

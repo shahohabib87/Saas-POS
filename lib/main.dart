@@ -8,6 +8,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final db = AppDatabase();
   await db.seedIfEmpty();
+  await db.reconcileRolePermissions();
   runApp(ProviderScope(
     overrides: [appDatabaseProvider.overrideWithValue(db)],
     child: const App(),
