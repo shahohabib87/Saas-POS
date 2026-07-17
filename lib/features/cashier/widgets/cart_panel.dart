@@ -8,8 +8,13 @@ import 'package:easycasher/features/kitchen/models/kitchen_order.dart';
 import 'package:easycasher/features/kitchen/providers/kitchen_provider.dart';
 import 'package:easycasher/features/tables/models/restaurant_table.dart';
 import 'package:easycasher/features/tables/providers/tables_provider.dart';
+import 'package:easycasher/features/tables/screens/tables_screen.dart';
 import 'package:easycasher/features/payment/screens/payment_screen.dart';
+import 'package:easycasher/features/payment/models/payment.dart';
+import 'package:easycasher/features/auth/providers/auth_provider.dart';
 import 'package:easycasher/features/delivery/providers/delivery_provider.dart';
+import 'package:easycasher/features/delivery/providers/pending_delivery_provider.dart';
+import 'package:easycasher/features/delivery/models/pending_delivery.dart';
 import 'package:easycasher/features/delivery/widgets/delivery_details_card.dart';
 import 'package:easycasher/core/entitlement/entitlement.dart';
 import 'package:easycasher/core/entitlement/entitlement_provider.dart';
@@ -32,6 +37,9 @@ class CartPanel extends ConsumerWidget {
     final discountValue = ref.watch(discountValueProvider);
 
     final isDelivery = orderType == OrderType.delivery;
+    // A dine-in order needs a table before anything can go on the check; until
+    // one is picked the cart shows the floor-plan prompt instead of items.
+    final needsTable = orderType == OrderType.dineIn && activeTable == null;
     // The fee rides on the area, so it only applies to an in-house delivery.
     final deliveryFee = isDelivery ? ref.watch(deliveryFeeProvider) : 0.0;
 
@@ -52,6 +60,10 @@ class CartPanel extends ConsumerWidget {
         children: [
           const _CartHeader(),
           Container(height: 1, color: AppColors.outlineVariant),
+          const _OrderTypeSelector(),
+          if (needsTable) ...[
+            const Expanded(child: _PickTablePrompt()),
+          ] else ...[
           if (isDelivery) const DeliveryDetailsCard(),
           Expanded(
             child: cartItems.isEmpty && !hasKots
@@ -92,7 +104,113 @@ class CartPanel extends ConsumerWidget {
             ),
             _ActionButtons(total: billTotal, kotTotal: kotSubtotal),
           ],
+          ],
         ],
+      ),
+    );
+  }
+}
+
+/// Order-type picker, moved off the old left sidebar into the cart to match
+/// the web POS — a 2×2 grid at the top of the panel. Switching type carries
+/// the same table bookkeeping the sidebar used to do: seating a dine-in keeps
+/// its saved tab, and leaving dine-in releases the active table.
+class _OrderTypeSelector extends ConsumerWidget {
+  const _OrderTypeSelector();
+
+  static const _types = <(OrderType, String)>[
+    (OrderType.dineIn, 'Dine-in'),
+    (OrderType.takeaway, 'Takeaway'),
+    (OrderType.delivery, 'Delivery'),
+    (OrderType.deliveryApp, 'Delivery App'),
+  ];
+
+  void _select(WidgetRef ref, OrderType type) {
+    ref.read(orderTypeProvider.notifier).state = type;
+    ref.read(appViewProvider.notifier).state = AppView.pos;
+    if (type == OrderType.dineIn) {
+      final activeTable = ref.read(activeTableProvider);
+      if (activeTable != null) {
+        final currentCart = ref.read(cartProvider);
+        final currentNote = ref.read(orderNoteProvider);
+        ref.read(savedTableOrdersProvider.notifier).update(
+              (s) => {...s, activeTable.id: currentCart},
+            );
+        ref.read(savedTableNotesProvider.notifier).update(
+              (s) => {...s, activeTable.id: currentNote},
+            );
+        ref.read(cartProvider.notifier).clear();
+        ref.read(orderNoteProvider.notifier).state = '';
+        ref.read(tableNumberProvider.notifier).state = '';
+        ref.read(activeTableProvider.notifier).state = null;
+      }
+    } else {
+      ref.read(activeTableProvider.notifier).state = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(orderTypeProvider);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      child: Column(
+        children: [
+          for (var row = 0; row < 2; row++)
+            Padding(
+              padding: EdgeInsets.only(top: row == 0 ? 0 : 6),
+              child: Row(
+                children: [
+                  for (var col = 0; col < 2; col++) ...[
+                    if (col == 1) const SizedBox(width: 6),
+                    Expanded(
+                      child: _OrderTypeButton(
+                        label: _types[row * 2 + col].$2,
+                        selected: _types[row * 2 + col].$1 == selected,
+                        onTap: () => _select(ref, _types[row * 2 + col].$1),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrderTypeButton extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _OrderTypeButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        height: 34,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : AppColors.surfaceLow,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : AppColors.onSurfaceVariant,
+          ),
+        ),
       ),
     );
   }
@@ -195,8 +313,6 @@ class _CartHeader extends ConsumerWidget {
               anyPending: anyPending,
             ),
           ],
-          if (orderType == OrderType.dineIn && activeTable == null)
-            const _TableInput(),
         ],
       ),
     );
@@ -233,64 +349,106 @@ class _CartHeader extends ConsumerWidget {
   }
 }
 
-class _TableInput extends ConsumerStatefulWidget {
-  const _TableInput();
-
-  @override
-  ConsumerState<_TableInput> createState() => _TableInputState();
-}
-
-class _TableInputState extends ConsumerState<_TableInput> {
-  late final TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller =
-        TextEditingController(text: ref.read(tableNumberProvider));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+/// Shown in the cart when a dine-in order has no table yet. Opens the floor
+/// plan as an overlay; picking a table seats it and closes the overlay, so the
+/// register never has to leave the two-panel layout.
+class _PickTablePrompt extends StatelessWidget {
+  const _PickTablePrompt();
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 84,
-      height: 34,
-      child: TextField(
-        controller: _controller,
-        keyboardType: TextInputType.number,
-        textAlign: TextAlign.center,
-        onChanged: (v) =>
-            ref.read(tableNumberProvider.notifier).state = v,
-        style: const TextStyle(fontSize: 13, color: AppColors.onSurface),
-        decoration: InputDecoration(
-          hintText: 'Table #',
-          hintStyle:
-              const TextStyle(fontSize: 12, color: AppColors.outline),
-          contentPadding: const EdgeInsets.symmetric(vertical: 8),
-          isDense: true,
-          filled: true,
-          fillColor: AppColors.surfaceLow,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide:
-                const BorderSide(color: AppColors.outlineVariant),
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.table_restaurant_rounded,
+              size: 52, color: AppColors.outlineVariant),
+          const SizedBox(height: 12),
+          const Text(
+            'No table selected',
+            style: TextStyle(
+              color: AppColors.onSurfaceVariant,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide:
-                const BorderSide(color: AppColors.outlineVariant),
+          const SizedBox(height: 4),
+          const Text(
+            'Pick a table to start a dine-in order',
+            style: TextStyle(color: AppColors.outline, fontSize: 12),
+            textAlign: TextAlign.center,
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide:
-                const BorderSide(color: AppColors.primary, width: 1.5),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () => showDialog(
+              context: context,
+              builder: (_) => const _TablePickerDialog(),
+            ),
+            icon: const Icon(Icons.table_restaurant_rounded, size: 18),
+            label: const Text('Pick a Table'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The floor plan, shown as an overlay. It closes itself the moment a table
+/// becomes active — [TablesScreen._openTable] sets [activeTableProvider], which
+/// this dialog listens for.
+class _TablePickerDialog extends ConsumerWidget {
+  const _TablePickerDialog();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(activeTableProvider, (_, next) {
+      if (next != null) Navigator.of(context).pop();
+    });
+
+    return Dialog(
+      insetPadding: const EdgeInsets.all(32),
+      backgroundColor: AppColors.background,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 980, maxHeight: 680),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 14, 12, 14),
+              color: AppColors.surface,
+              child: Row(
+                children: [
+                  const Text(
+                    'Select a Table',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    color: AppColors.onSurfaceVariant,
+                    tooltip: 'Close',
+                  ),
+                ],
+              ),
+            ),
+            Container(height: 1, color: AppColors.outlineVariant),
+            const Expanded(child: TablesScreen()),
+          ],
         ),
       ),
     );
@@ -631,6 +789,10 @@ class _ActionButtons extends ConsumerWidget {
     final orderType = ref.watch(orderTypeProvider);
     final activeTable = ref.watch(activeTableProvider);
     final isDineIn = orderType == OrderType.dineIn && activeTable != null;
+    // Own-delivery is cash on delivery: the order leaves unpaid with a driver
+    // and is settled on the Delivery screen when they return, so the till's
+    // primary action becomes "Out for Delivery" rather than "Pay Now".
+    final isDelivery = orderType == OrderType.delivery;
 
     final locked = ref.watch(entitlementProvider).level == EntitlementLevel.locked;
     // Settling a check that's already gone to the kitchen is always allowed —
@@ -707,23 +869,42 @@ class _ActionButtons extends ConsumerWidget {
           SizedBox(
             width: double.infinity,
             height: 48,
-            child: ElevatedButton(
-              onPressed: (locked && !isSettlingOpenCheck)
-                  ? () => _blockedBySubscription(context)
-                  : () => _confirmPay(context, ref),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-                elevation: 0,
-              ),
-              child: Text(
-                'Pay Now  •  IQD ${total.toStringAsFixed(0)}',
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-            ),
+            child: isDelivery
+                ? ElevatedButton.icon(
+                    onPressed: locked
+                        ? () => _blockedBySubscription(context)
+                        : () => _sendOutForDelivery(context, ref, total),
+                    icon: const Icon(Icons.moped_rounded, size: 18),
+                    label: Text(
+                      'Out for Delivery  •  IQD ${total.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                  )
+                : ElevatedButton(
+                    onPressed: (locked && !isSettlingOpenCheck)
+                        ? () => _blockedBySubscription(context)
+                        : () => _confirmPay(context, ref),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      'Pay Now  •  IQD ${total.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -738,6 +919,89 @@ class _ActionButtons extends ConsumerWidget {
           'You can still settle open checks and close the shift.',
         ),
         backgroundColor: AppColors.danger,
+      ),
+    );
+  }
+
+  /// Send the delivery order out with its driver, unpaid. It moves to the
+  /// Delivery screen under that driver; the cash is taken when they return.
+  void _sendOutForDelivery(BuildContext context, WidgetRef ref, double total) {
+    final cartItems = ref.read(cartProvider);
+    if (cartItems.isEmpty) {
+      _toast(context, 'Add items before sending a delivery.');
+      return;
+    }
+
+    final delivery = ref.read(deliveryDetailsProvider);
+    if (!delivery.isComplete) {
+      _toast(context,
+          'Phone, driver and area are required before sending a delivery.');
+      return;
+    }
+
+    // Recompute the bill from the cart so the stored total is self-contained.
+    final subtotal = cartItems.fold(0.0, (s, i) => s + i.subtotal);
+    final discountType = ref.read(discountTypeProvider);
+    final discountValue = ref.read(discountValueProvider);
+    final discountAmount = discountType == DiscountType.percent
+        ? subtotal * (discountValue / 100)
+        : discountValue.clamp(0.0, subtotal);
+    final tax = (subtotal - discountAmount) * AppConstants.taxRate;
+
+    final driverName = (ref.read(driversProvider).valueOrNull ?? [])
+            .where((d) => d.id == delivery.driverId)
+            .map((d) => d.name)
+            .firstOrNull ??
+        'Driver';
+    final staff = ref.read(currentStaffProvider);
+
+    final pending = PendingDelivery(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      orderNumber: ref.read(orderNumberProvider),
+      staffName: staff?.name ?? '—',
+      driverId: delivery.driverId!,
+      driverName: driverName,
+      customerName: delivery.customerName,
+      customerPhone: delivery.phone,
+      deliveryNotes: delivery.notes,
+      areaId: delivery.areaId,
+      deliveryFee: delivery.areaFee,
+      items: [
+        for (final ci in cartItems)
+          CompletedItem(
+            name: ci.item.name,
+            emoji: ci.item.emoji,
+            quantity: ci.quantity,
+            unitPrice: ci.unitPrice,
+            modifiersLabel: ci.modifierSummary,
+          ),
+      ],
+      subtotal: subtotal,
+      discountAmount: discountAmount,
+      tax: tax,
+      total: total,
+      placedAt: DateTime.now(),
+    );
+
+    ref.read(pendingDeliveriesProvider.notifier).add(pending);
+
+    // Reset the till for the next order and start a fresh order number.
+    ref.read(cartProvider.notifier).clear();
+    ref.read(orderNoteProvider.notifier).state = '';
+    ref.read(discountValueProvider.notifier).state = 0;
+    ref.read(deliveryDetailsProvider.notifier).clear();
+    ref.read(orderCounterProvider.notifier).bump();
+
+    _toast(context, 'Sent out with $driverName — collect on return.',
+        success: true);
+  }
+
+  void _toast(BuildContext context, String message, {bool success = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: success ? AppColors.success : AppColors.danger,
+        duration: const Duration(seconds: 2),
       ),
     );
   }

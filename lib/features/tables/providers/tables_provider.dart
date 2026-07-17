@@ -17,6 +17,10 @@ class TablesNotifier extends StateNotifier<List<RestaurantTable>> {
   }
 
   void setStatus(String id, TableStatus status) {
+    // Takeout and delivery orders carry a synthetic table id that was never a
+    // real row (e.g. 'takeout'); there is nothing to update or persist for
+    // those, and firstWhere below would otherwise throw "No element".
+    if (!state.any((t) => t.id == id)) return;
     state = [
       for (final t in state)
         if (t.id == id) t.copyWith(status: status) else t,

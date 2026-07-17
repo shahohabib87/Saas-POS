@@ -60,8 +60,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   double get _totalBeforeTip => _discountedSubtotal + _tax;
   double get _total => _totalBeforeTip + _tip;
 
-  double get _cashReceived =>
-      double.tryParse(_cashController.text) ?? 0;
+  // An empty field means the cashier tendered the exact total — the common
+  // case — so the sale can be completed straight away without typing anything.
+  // Any amount they do type still drives the change calculation.
+  double get _cashReceived {
+    final text = _cashController.text.trim();
+    if (text.isEmpty) return _total;
+    return double.tryParse(text) ?? 0;
+  }
+
   double get _change => max(0.0, _cashReceived - _total);
 
   bool get _canComplete =>

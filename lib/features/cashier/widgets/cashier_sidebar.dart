@@ -6,23 +6,21 @@ import 'package:easycasher/features/auth/models/staff.dart';
 import 'package:easycasher/features/auth/providers/auth_provider.dart';
 import 'package:easycasher/features/cashier/providers/cashier_provider.dart';
 import 'package:easycasher/features/kitchen/providers/kitchen_provider.dart';
-import 'package:easycasher/features/tables/providers/tables_provider.dart';
-import 'package:easycasher/core/entitlement/entitlement.dart';
-import 'package:easycasher/core/entitlement/entitlement_provider.dart';
 
-class CashierSidebar extends ConsumerWidget {
-  const CashierSidebar({super.key});
+/// The screen navigation as a persistent left column — always visible, the way
+/// the web console keeps its nav in view. The order-type picker no longer lives
+/// here (it moved into the cart to match the web POS); this rail just reaches
+/// the operational screens (KDS, Orders, Shift, Settings…) the all-in-one
+/// terminal still has to run.
+class NavSidebar extends ConsumerWidget {
+  const NavSidebar({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final orderType    = ref.watch(orderTypeProvider);
     final appView      = ref.watch(appViewProvider);
     final pendingKots  = ref.watch(pendingKotCountProvider);
     final permissions  = ref.watch(currentPermissionsProvider);
 
-    final showTables       = permissions.contains(AppPermission.tables);
-    final showTakeout      = permissions.contains(AppPermission.takeout);
-    final showDelivery     = permissions.contains(AppPermission.delivery);
     final showOrders       = permissions.contains(AppPermission.orders);
     final showOnlineOrders = permissions.contains(AppPermission.onlineOrders);
     final showKds          = permissions.contains(AppPermission.kitchenDisplay);
@@ -30,99 +28,14 @@ class CashierSidebar extends ConsumerWidget {
     final showShift        = permissions.contains(AppPermission.shift);
     final showSettings     = permissions.contains(AppPermission.settings);
 
-    final hasOrderTypes = showTables || showTakeout || showDelivery;
-    final hasScreens = showOrders ||
-        showOnlineOrders ||
-        showKds ||
-        showDispatch ||
-        showShift ||
-        showSettings;
-
     return Container(
-      width: 220,
+      width: 210,
       color: AppColors.sidebar,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _SidebarHeader(),
-          const SizedBox(height: 16),
-          // New Order button — only in POS view
-          if (appView == AppView.pos)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  // A new order is exactly what a lapsed subscription blocks.
-                  if (ref.read(entitlementProvider).level ==
-                      EntitlementLevel.locked) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                            'Subscription expired — renew to start new orders.'),
-                        backgroundColor: AppColors.danger,
-                      ),
-                    );
-                    return;
-                  }
-                  ref.read(orderCounterProvider.notifier).bump();
-                  ref.read(cartProvider.notifier).clear();
-                  ref.read(orderNoteProvider.notifier).state = '';
-                  ref.read(discountValueProvider.notifier).state = 0;
-                },
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: const Text('New Order'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryLight,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 40),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  elevation: 0,
-                  textStyle: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ),
-          // ORDER TYPE section
-          if (hasOrderTypes) ...[
-            const SizedBox(height: 20),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 18),
-              child: Text(
-                'ORDER TYPE',
-                style: TextStyle(
-                  color: Colors.white38,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ),
-            const SizedBox(height: 6),
-            if (showTables)
-              _NavItem(
-                icon: Icons.table_restaurant_rounded,
-                label: 'Tables',
-                type: OrderType.dineIn,
-                selected: orderType,
-              ),
-            if (showTakeout)
-              _NavItem(
-                icon: Icons.shopping_bag_outlined,
-                label: 'Takeout',
-                type: OrderType.takeaway,
-                selected: orderType,
-              ),
-            if (showDelivery)
-              _NavItem(
-                icon: Icons.delivery_dining_rounded,
-                label: 'Delivery',
-                type: OrderType.delivery,
-                selected: orderType,
-              ),
-          ],
-          // SCREENS section
-          if (hasScreens) ...[
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _SidebarHeader(),
             const SizedBox(height: 20),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 18),
@@ -137,6 +50,14 @@ class CashierSidebar extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 6),
+            // Register — the way back to the till from any operational screen.
+            _ViewNavItem(
+              icon: Icons.point_of_sale_rounded,
+              label: 'Register',
+              badge: 0,
+              view: AppView.pos,
+              selected: appView,
+            ),
             if (showOrders)
               _ViewNavItem(
                 icon: Icons.receipt_long_rounded,
@@ -164,14 +85,14 @@ class CashierSidebar extends ConsumerWidget {
             if (showDispatch)
               _ViewNavItem(
                 icon: Icons.moped_rounded,
-                label: 'Dispatch',
+                label: 'Delivery',
                 badge: 0,
                 view: AppView.dispatch,
                 selected: appView,
               ),
             if (showShift)
               _ViewNavItem(
-                icon: Icons.point_of_sale_rounded,
+                icon: Icons.account_balance_wallet_rounded,
                 label: 'Shift',
                 badge: 0,
                 view: AppView.shift,
@@ -185,13 +106,13 @@ class CashierSidebar extends ConsumerWidget {
                 view: AppView.settings,
                 selected: appView,
               ),
+            const Spacer(),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(14, 0, 14, 20),
+              child: _SessionInfo(),
+            ),
           ],
-          const Spacer(),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(14, 0, 14, 20),
-            child: _SessionInfo(),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -233,92 +154,6 @@ class _SidebarHeader extends StatelessWidget {
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _NavItem extends ConsumerWidget {
-  final IconData icon;
-  final String label;
-  final OrderType type;
-  final OrderType selected;
-
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.type,
-    required this.selected,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isSelected = type == selected;
-    return GestureDetector(
-      onTap: () {
-        ref.read(orderTypeProvider.notifier).state = type;
-        ref.read(appViewProvider.notifier).state = AppView.pos;
-        if (type == OrderType.dineIn) {
-          final activeTable = ref.read(activeTableProvider);
-          if (activeTable != null) {
-            final currentCart = ref.read(cartProvider);
-            final currentNote = ref.read(orderNoteProvider);
-            ref.read(savedTableOrdersProvider.notifier).update(
-                  (s) => {...s, activeTable.id: currentCart},
-                );
-            ref.read(savedTableNotesProvider.notifier).update(
-                  (s) => {...s, activeTable.id: currentNote},
-                );
-            ref.read(cartProvider.notifier).clear();
-            ref.read(orderNoteProvider.notifier).state = '';
-            ref.read(tableNumberProvider.notifier).state = '';
-            ref.read(activeTableProvider.notifier).state = null;
-          }
-        } else {
-          ref.read(activeTableProvider.notifier).state = null;
-        }
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? Colors.white.withValues(alpha: 0.12)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected
-                ? Colors.white.withValues(alpha: 0.2)
-                : Colors.transparent,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 18,
-                color: isSelected ? Colors.white : Colors.white54),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                  color: isSelected ? Colors.white : Colors.white60,
-                ),
-              ),
-            ),
-            if (isSelected)
-              Container(
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  color: AppColors.primaryLight,
-                  shape: BoxShape.circle,
-                ),
-              ),
-          ],
-        ),
       ),
     );
   }

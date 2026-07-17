@@ -150,7 +150,9 @@ bool Win32Window::Create(const std::wstring& title,
 }
 
 bool Win32Window::Show() {
-  return ShowWindow(window_handle_, SW_SHOWNORMAL);
+  // Open maximized so the register uses the full screen and nothing is clipped
+  // on shorter displays; restoring down falls back to the size set in main.cpp.
+  return ShowWindow(window_handle_, SW_SHOWMAXIMIZED);
 }
 
 // static
