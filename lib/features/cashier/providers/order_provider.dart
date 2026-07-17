@@ -10,7 +10,7 @@ enum OrderType { dineIn, takeaway, delivery, deliveryApp }
 
 /// Screens this terminal can show. Menu and Reports intentionally absent —
 /// they live in the web console now.
-enum AppView { pos, orders, onlineOrders, kds, dispatch, settings }
+enum AppView { pos, orders, onlineOrders, kds, dispatch, shift, settings }
 
 final orderTypeProvider =
     StateProvider<OrderType>((ref) => OrderType.dineIn);

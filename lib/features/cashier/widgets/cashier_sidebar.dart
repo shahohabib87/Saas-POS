@@ -25,6 +25,7 @@ class CashierSidebar extends ConsumerWidget {
     final showOnlineOrders = permissions.contains(AppPermission.onlineOrders);
     final showKds          = permissions.contains(AppPermission.kitchenDisplay);
     final showDispatch     = permissions.contains(AppPermission.dispatch);
+    final showShift        = permissions.contains(AppPermission.shift);
     final showSettings     = permissions.contains(AppPermission.settings);
 
     final hasOrderTypes = showTables || showTakeout || showDelivery;
@@ -32,6 +33,7 @@ class CashierSidebar extends ConsumerWidget {
         showOnlineOrders ||
         showKds ||
         showDispatch ||
+        showShift ||
         showSettings;
 
     return Container(
@@ -151,6 +153,14 @@ class CashierSidebar extends ConsumerWidget {
                 label: 'Dispatch',
                 badge: 0,
                 view: AppView.dispatch,
+                selected: appView,
+              ),
+            if (showShift)
+              _ViewNavItem(
+                icon: Icons.point_of_sale_rounded,
+                label: 'Shift',
+                badge: 0,
+                view: AppView.shift,
                 selected: appView,
               ),
             if (showSettings)

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
@@ -126,6 +127,62 @@ class SettingsKv extends Table {
   Set<Column> get primaryKey => {key};
 }
 
+/// A cashier's session at the drawer: opened with a counted float, closed with
+/// a counted total. The gap between what the drawer should hold and what it
+/// actually holds is the whole point — it is how a restaurant catches theft
+/// and till errors, so a closed shift is immutable history.
+///
+/// [expectedCash] is stored rather than recomputed on demand: it is what we
+/// told the cashier at the time, and a later refund or clock change must not
+/// silently rewrite a past reconciliation.
+@DataClassName('ShiftRow')
+class Shifts extends Table {
+  TextColumn get id => text()();
+  TextColumn get staffId => text()();
+  TextColumn get staffName => text()();
+  IntColumn get openedAt => integer()(); // unix milliseconds
+  IntColumn get closedAt => integer().nullable()(); // null = still open
+  RealColumn get openingFloat => real()();
+  RealColumn get countedCash => real().nullable()(); // what the cashier counted
+  RealColumn get expectedCash => real().nullable()(); // what we expected
+  TextColumn get closingNote => text().withDefault(const Constant(''))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Cash entering or leaving the drawer for a reason other than a sale — a
+/// float top-up, a supplier paid in cash, a bank drop. Reasons are mandatory:
+/// an unexplained movement is indistinguishable from a theft.
+@DataClassName('CashMovementRow')
+class CashMovements extends Table {
+  TextColumn get id => text()();
+  TextColumn get shiftId => text()();
+  TextColumn get kind => text()(); // 'in' | 'out'
+  RealColumn get amount => real()(); // always positive; kind carries direction
+  TextColumn get reason => text()();
+  TextColumn get staffName => text()();
+  IntColumn get at => integer()(); // unix milliseconds
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// What was taken during a shift's window. Derived from orders, never stored.
+class ShiftTakings {
+  final int orderCount;
+  final double gross;
+  final double cashSales; // net of change given back
+  final double cardSales;
+
+  const ShiftTakings({
+    this.orderCount = 0,
+    this.gross = 0,
+    this.cashSales = 0,
+    this.cardSales = 0,
+  });
+}
+
 // ── Database ──────────────────────────────────────────────────────────────────
 
 @DriftDatabase(tables: [
@@ -137,13 +194,37 @@ class SettingsKv extends Table {
   Orders,
   OrderItems,
   SettingsKv,
+  Shifts,
+  CashMovements,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting() : super(NativeDatabase.memory());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 3;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (Migrator m) async {
+          await m.createAll();
+        },
+        // Migrations must be additive.
+        //
+        // This used to drop every table and rebuild, on the reasoning that the
+        // local DB is just a cache of the cloud. That was never quite true and
+        // is now plainly false: `settings_kv` holds `cloud_outbox` (sales that
+        // have been rung up but not yet reached the server) and the auth token,
+        // and `shifts` holds cash reconciliation history that exists nowhere
+        // else. Dropping those loses real money and breaks the promise that a
+        // queued sale is never lost. Add tables and columns; never wipe.
+        onUpgrade: (Migrator m, int from, int to) async {
+          if (from < 3) {
+            await m.createTable(shifts);
+            await m.createTable(cashMovements);
+          }
+        },
+      );
 
   static LazyDatabase _openConnection() {
     return LazyDatabase(() async {
@@ -617,6 +698,131 @@ class AppDatabase extends _$AppDatabase {
                 t.permission.equals(perm.name)))
           .go();
     }
+  }
+
+  // ── Shifts ────────────────────────────────────────────────────────────────
+
+  /// The shift currently open on this terminal, if any. At most one may be
+  /// open at a time — [openShift] refuses otherwise.
+  Future<ShiftRow?> getOpenShift() async {
+    final rows = await (select(shifts)
+          ..where((t) => t.closedAt.isNull())
+          ..orderBy([(t) => OrderingTerm.desc(t.openedAt)])
+          ..limit(1))
+        .get();
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  /// Open a shift with a counted starting float.
+  ///
+  /// Throws [StateError] if one is already open: two concurrent shifts would
+  /// make the drawer impossible to reconcile, since sales are attributed to a
+  /// shift by time window.
+  Future<ShiftRow> openShift({
+    required String staffId,
+    required String staffName,
+    required double openingFloat,
+  }) async {
+    if (await getOpenShift() != null) {
+      throw StateError('A shift is already open on this terminal.');
+    }
+    final row = ShiftsCompanion.insert(
+      id: _uuid(),
+      staffId: staffId,
+      staffName: staffName,
+      openedAt: DateTime.now().millisecondsSinceEpoch,
+      openingFloat: openingFloat,
+    );
+    return into(shifts).insertReturning(row);
+  }
+
+  Future<void> addCashMovement({
+    required String shiftId,
+    required bool isIn,
+    required double amount,
+    required String reason,
+    required String staffName,
+  }) =>
+      into(cashMovements).insert(CashMovementsCompanion.insert(
+        id: _uuid(),
+        shiftId: shiftId,
+        kind: isIn ? 'in' : 'out',
+        amount: amount.abs(),
+        reason: reason,
+        staffName: staffName,
+        at: DateTime.now().millisecondsSinceEpoch,
+      ));
+
+  Future<List<CashMovementRow>> getCashMovements(String shiftId) =>
+      (select(cashMovements)
+            ..where((t) => t.shiftId.equals(shiftId))
+            ..orderBy([(t) => OrderingTerm.desc(t.at)]))
+          .get();
+
+  /// Close a shift against a counted drawer. [countedCash] is what the cashier
+  /// physically counted; the variance is derived, never entered.
+  Future<void> closeShift({
+    required String shiftId,
+    required double countedCash,
+    required double expectedCash,
+    String note = '',
+  }) async {
+    await (update(shifts)..where((t) => t.id.equals(shiftId))).write(
+      ShiftsCompanion(
+        closedAt: Value(DateTime.now().millisecondsSinceEpoch),
+        countedCash: Value(countedCash),
+        expectedCash: Value(expectedCash),
+        closingNote: Value(note),
+      ),
+    );
+  }
+
+  Future<List<ShiftRow>> getRecentShifts({int limit = 20}) => (select(shifts)
+        ..where((t) => t.closedAt.isNotNull())
+        ..orderBy([(t) => OrderingTerm.desc(t.openedAt)])
+        ..limit(limit))
+      .get();
+
+  /// Takings for a shift's time window.
+  ///
+  /// Orders are attributed by timestamp rather than a foreign key: order rows
+  /// are pushed to the cloud verbatim and adding a column would change the
+  /// `/api/sync` contract. [until] is null for an open shift, meaning "now".
+  Future<ShiftTakings> getShiftTakings({
+    required int openedAt,
+    int? until,
+  }) async {
+    final end = until ?? DateTime.now().millisecondsSinceEpoch;
+    final rows = await (select(orders)
+          ..where((t) =>
+              t.timestamp.isBiggerOrEqualValue(openedAt) &
+              t.timestamp.isSmallerOrEqualValue(end)))
+        .get();
+
+    var cash = 0.0, card = 0.0, gross = 0.0;
+    for (final o in rows) {
+      // cashPaid is what was handed over, so the change given back has to come
+      // off it — only the difference stays in the drawer.
+      cash += o.cashPaid - o.changeAmount;
+      card += o.cardPaid;
+      gross += o.total;
+    }
+    return ShiftTakings(
+      orderCount: rows.length,
+      gross: gross,
+      cashSales: cash,
+      cardSales: card,
+    );
+  }
+
+  static String _uuid() {
+    final r = Random.secure();
+    final b = List<int>.generate(16, (_) => r.nextInt(256));
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    String hex(int s, int e) =>
+        b.sublist(s, e).map((x) => x.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex(0, 4)}-${hex(4, 6)}-${hex(6, 8)}-${hex(8, 10)}-${hex(10, 16)}';
   }
 
   // ── Restaurant Tables ─────────────────────────────────────────────────────

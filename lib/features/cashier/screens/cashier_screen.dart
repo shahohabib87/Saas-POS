@@ -13,6 +13,7 @@ import 'package:easycasher/features/orders/screens/orders_screen.dart';
 import 'package:easycasher/features/delivery/screens/dispatch_screen.dart';
 import 'package:easycasher/features/online_orders/screens/online_orders_screen.dart';
 import 'package:easycasher/features/settings/screens/settings_screen.dart';
+import 'package:easycasher/features/shift/screens/shift_screen.dart';
 import 'package:easycasher/features/tables/providers/tables_provider.dart';
 import 'package:easycasher/features/tables/screens/tables_screen.dart';
 
@@ -40,6 +41,7 @@ class CashierScreen extends ConsumerWidget {
               AppView.orders       => const OrdersScreen(),
               AppView.onlineOrders => const OnlineOrdersScreen(),
               AppView.dispatch     => const DispatchScreen(),
+              AppView.shift        => const ShiftScreen(),
               AppView.settings     => const SettingsScreen(),
               AppView.pos => Column(
                   children: [
