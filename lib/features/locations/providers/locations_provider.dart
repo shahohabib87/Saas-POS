@@ -11,7 +11,9 @@ class LocationsNotifier extends StateNotifier<List<Location>> {
   }
 
   Future<void> _load() async {
-    state = await _db.getLocations();
+    final rows = await _db.getLocations();
+    if (!mounted) return; // sync may invalidate/dispose us mid-load
+    state = rows;
   }
 
   void add(String name) {

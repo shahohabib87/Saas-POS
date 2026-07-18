@@ -29,7 +29,9 @@ class OrderCounterNotifier extends StateNotifier<int> {
   }
 
   Future<void> _load() async {
-    state = await _db.loadTodayCounter();
+    final n = await _db.loadTodayCounter();
+    if (!mounted) return; // sync may invalidate/dispose us mid-load
+    state = n;
   }
 
   void bump() {

@@ -13,7 +13,9 @@ class ShiftNotifier extends StateNotifier<ShiftRow?> {
   }
 
   Future<void> _load() async {
-    state = await _db.getOpenShift();
+    final open = await _db.getOpenShift();
+    if (!mounted) return; // a refresh/invalidate may dispose us mid-load
+    state = open;
   }
 
   /// Reload from disk. A shift outlives a login — the cashier who opened it

@@ -60,7 +60,9 @@ class RolePermissionsNotifier
   }
 
   Future<void> _load() async {
-    state = await _db.getRolePermissions();
+    final perms = await _db.getRolePermissions();
+    if (!mounted) return; // sync may invalidate/dispose us mid-load
+    state = perms;
   }
 
   void setPermission(StaffRole role, AppPermission perm, bool enabled) {

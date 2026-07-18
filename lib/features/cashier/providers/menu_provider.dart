@@ -14,7 +14,9 @@ class CategoriesNotifier extends StateNotifier<List<Category>> {
   }
 
   Future<void> _load() async {
-    state = await _db.getCategories();
+    final rows = await _db.getCategories();
+    if (!mounted) return; // sync may invalidate/dispose us mid-load
+    state = rows;
   }
 
   String _newId() => 'cat_${DateTime.now().millisecondsSinceEpoch}';
@@ -51,7 +53,9 @@ class MenuItemsNotifier extends StateNotifier<List<MenuItem>> {
   }
 
   Future<void> _load() async {
-    state = await _db.getMenuItems();
+    final rows = await _db.getMenuItems();
+    if (!mounted) return; // sync may invalidate/dispose us mid-load
+    state = rows;
   }
 
   String _newId() => 'item_${DateTime.now().millisecondsSinceEpoch}';

@@ -13,7 +13,9 @@ class PaymentHistoryNotifier extends StateNotifier<List<CompletedPayment>> {
   }
 
   Future<void> _load() async {
-    state = await _db.getOrders();
+    final rows = await _db.getOrders();
+    if (!mounted) return; // sync may invalidate/dispose us mid-load
+    state = rows;
   }
 
   void add(CompletedPayment payment) {

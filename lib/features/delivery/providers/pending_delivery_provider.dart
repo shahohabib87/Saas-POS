@@ -20,6 +20,7 @@ class PendingDeliveriesNotifier extends StateNotifier<List<PendingDelivery>> {
 
   Future<void> _load() async {
     final raw = await _db.kvGet(_key);
+    if (!mounted) return; // sync may invalidate/dispose us mid-load
     if (raw == null || raw.isEmpty) return;
     try {
       final list = jsonDecode(raw) as List;

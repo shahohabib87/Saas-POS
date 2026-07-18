@@ -13,7 +13,11 @@ class TablesNotifier extends StateNotifier<List<RestaurantTable>> {
   }
 
   Future<void> _load() async {
-    state = await _db.getTables();
+    final rows = await _db.getTables();
+    // Cloud sync invalidates this provider on startup; if that disposes us
+    // mid-load, setting state would throw "used after dispose" and crash.
+    if (!mounted) return;
+    state = rows;
   }
 
   void setStatus(String id, TableStatus status) {

@@ -12,7 +12,9 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   }
 
   Future<void> _load() async {
-    state = await _db.getSettings();
+    final s = await _db.getSettings();
+    if (!mounted) return; // sync may invalidate/dispose us mid-load
+    state = s;
   }
 
   void update(AppSettings s) {
@@ -44,7 +46,9 @@ class StaffListNotifier extends StateNotifier<List<Staff>> {
   }
 
   Future<void> _load() async {
-    state = await _db.getStaff();
+    final rows = await _db.getStaff();
+    if (!mounted) return; // sync may invalidate/dispose us mid-load
+    state = rows;
   }
 
   void add(Staff s) {
