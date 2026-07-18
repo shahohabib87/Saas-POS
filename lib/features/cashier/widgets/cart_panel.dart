@@ -977,6 +977,11 @@ class _ActionButtons extends ConsumerWidget {
         'Driver';
     final staff = ref.read(currentStaffProvider);
 
+    // Claim the next order number BEFORE reading it — reading first reuses the
+    // number of whichever order last claimed the counter (live-caught: a
+    // takeout and a delivery both went to the kitchen as the same Order #).
+    ref.read(orderCounterProvider.notifier).bump();
+
     final pending = PendingDelivery(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       orderNumber: ref.read(orderNumberProvider),
@@ -1016,12 +1021,11 @@ class _ActionButtons extends ConsumerWidget {
           orderType: KotOrderType.delivery,
         );
 
-    // Reset the till for the next order and start a fresh order number.
+    // Reset the till for the next order (its number was claimed above).
     ref.read(cartProvider.notifier).clear();
     ref.read(orderNoteProvider.notifier).state = '';
     ref.read(discountValueProvider.notifier).state = 0;
     ref.read(deliveryDetailsProvider.notifier).clear();
-    ref.read(orderCounterProvider.notifier).bump();
 
     _toast(context, 'Sent out with $driverName — collect on return.',
         success: true);
