@@ -8,6 +8,8 @@ import 'package:easycasher/features/payment/providers/payment_provider.dart';
 import 'package:easycasher/features/tables/models/restaurant_table.dart';
 import 'package:easycasher/features/tables/providers/tables_provider.dart';
 import 'package:easycasher/features/cashier/providers/cashier_provider.dart';
+import 'package:easycasher/features/delivery/models/pending_delivery.dart';
+import 'package:easycasher/features/delivery/providers/pending_delivery_provider.dart';
 
 // ── Shared providers ──────────────────────────────────────────────────────────
 
@@ -199,6 +201,7 @@ class _ActiveOrdersBody extends ConsumerWidget {
     final allKots      = ref.watch(kitchenProvider);
     final tables       = ref.watch(tablesProvider);
     final savedOrders  = ref.watch(savedTableOrdersProvider);
+    final pending      = ref.watch(pendingDeliveriesProvider);
     final selectedType = ref.watch(_selectedOrderTypeProvider);
 
     final activeTableIds = {
@@ -231,16 +234,18 @@ class _ActiveOrdersBody extends ConsumerWidget {
       );
     }).toList()..sort((a, b) => a.table.number.compareTo(b.table.number));
 
-    final filtered = selectedType == _OrderType.all
-        ? allEntries
-        : allEntries.where((e) => e.type == selectedType).toList();
+    // Active work is dine-in tables PLUS deliveries currently out with a driver.
+    final showDineIn   = selectedType == _OrderType.all || selectedType == _OrderType.dineIn;
+    final showDelivery = selectedType == _OrderType.all || selectedType == _OrderType.delivery;
 
-    final dineInCount = allEntries.where((e) => e.type == _OrderType.dineIn).length;
+    final dineIn = showDineIn ? allEntries : const <_OrderEntry>[];
+    final dineInCount   = allEntries.length; // every table entry is dine-in
+    final deliveryCount = pending.length;
 
-    final ready     = filtered.where((e) => e.status == _OrderStatus.ready).toList();
-    final preparing = filtered.where((e) => e.status == _OrderStatus.preparing).toList();
-    final active    = filtered.where((e) => e.status == _OrderStatus.active).toList();
-    final unsent    = filtered.where((e) => e.status == _OrderStatus.unsent).toList();
+    final ready     = dineIn.where((e) => e.status == _OrderStatus.ready).toList();
+    final preparing = dineIn.where((e) => e.status == _OrderStatus.preparing).toList();
+    final active    = dineIn.where((e) => e.status == _OrderStatus.active).toList();
+    final unsent    = dineIn.where((e) => e.status == _OrderStatus.unsent).toList();
 
     final List<Widget> listItems = [];
 
@@ -258,12 +263,31 @@ class _ActiveOrdersBody extends ConsumerWidget {
     addSection('In Queue',   AppColors.warning,          Icons.hourglass_top_rounded, active);
     addSection('Unsent',     AppColors.onSurfaceVariant, Icons.edit_note_rounded,     unsent);
 
+    // Out-for-delivery orders never opened a table, so they live in their own
+    // store — surface them here (under the Delivery filter). Cash is still
+    // collected on the Delivery screen, which a tap jumps to.
+    if (showDelivery && pending.isNotEmpty) {
+      listItems.add(_SectionHeader(
+          label: 'Out for Delivery',
+          color: AppColors.primary,
+          icon: Icons.moped_rounded,
+          count: pending.length));
+      for (final d in pending) {
+        listItems.add(_DeliveryOrderCard(
+          delivery: d,
+          onOpen: () =>
+              ref.read(appViewProvider.notifier).state = AppView.dispatch,
+        ));
+      }
+      listItems.add(const SizedBox(height: 8));
+    }
+
     return Container(
       color: AppColors.background,
       child: Column(
         children: [
           _ActiveSubHeader(
-            total: allEntries.length,
+            total: allEntries.length + pending.length,
             ready: ready.length,
             preparing: preparing.length,
             active: active.length,
@@ -271,11 +295,12 @@ class _ActiveOrdersBody extends ConsumerWidget {
           _TypeTabBar(
             selected: selectedType,
             dineInCount: dineInCount,
+            deliveryCount: deliveryCount,
             onSelect: (t) => ref.read(_selectedOrderTypeProvider.notifier).state = t,
           ),
           Container(height: 1, color: AppColors.outlineVariant),
           Expanded(
-            child: filtered.isEmpty
+            child: listItems.isEmpty
                 ? _EmptyState(
                     icon: selectedType.icon,
                     message: selectedType == _OrderType.all
@@ -309,6 +334,102 @@ class _ActiveOrdersBody extends ConsumerWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // COMPLETED ORDERS BODY
 // ─────────────────────────────────────────────────────────────────────────────
+
+// A delivery that's out with a driver, shown in the Active list. Tapping jumps
+// to the Delivery screen where the cash is collected on the driver's return.
+class _DeliveryOrderCard extends StatelessWidget {
+  final PendingDelivery delivery;
+  final VoidCallback onOpen;
+  const _DeliveryOrderCard({required this.delivery, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final sub = [
+      '🛵 ${delivery.driverName}',
+      if (delivery.customerName.isNotEmpty) delivery.customerName,
+      if (delivery.customerPhone.isNotEmpty) delivery.customerPhone,
+    ].join(' · ');
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onOpen,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border:
+                  Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.moped_rounded,
+                      size: 20, color: AppColors.primary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(delivery.orderNumber,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: AppColors.onSurface)),
+                      const SizedBox(height: 2),
+                      Text(sub,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('IQD ${delivery.total.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: AppColors.onSurface)),
+                    const SizedBox(height: 3),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text('Collect on return',
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _CompletedOrdersBody extends ConsumerWidget {
   const _CompletedOrdersBody();
@@ -859,29 +980,33 @@ class _ActiveSubHeader extends StatelessWidget {
 class _TypeTabBar extends StatelessWidget {
   final _OrderType selected;
   final int dineInCount;
+  final int deliveryCount;
   final void Function(_OrderType) onSelect;
 
   const _TypeTabBar({
     required this.selected,
     required this.dineInCount,
+    required this.deliveryCount,
     required this.onSelect,
   });
+
+  // Only the types that can actually be active are offered — takeout is paid
+  // instantly (it goes to Completed) and Delivery App has no data source.
+  static const _visible = [_OrderType.all, _OrderType.dineIn, _OrderType.delivery];
 
   @override
   Widget build(BuildContext context) {
     final counts = {
-      _OrderType.all:    dineInCount,
-      _OrderType.dineIn: dineInCount,
-      _OrderType.takeout:     0,
-      _OrderType.delivery:    0,
-      _OrderType.deliveryApp: 0,
+      _OrderType.all:      dineInCount + deliveryCount,
+      _OrderType.dineIn:   dineInCount,
+      _OrderType.delivery: deliveryCount,
     };
 
     return Container(
       color: AppColors.surface,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
-        children: _OrderType.values.map((type) {
+        children: _visible.map((type) {
           final isSelected = type == selected;
           final count = counts[type] ?? 0;
           return Padding(
