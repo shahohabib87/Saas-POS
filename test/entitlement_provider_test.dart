@@ -92,6 +92,10 @@ void main() {
   });
 
   test('unknown (never connected) leaves the till usable', () async {
+    // Let the constructor's fire-and-forget refresh settle before asserting —
+    // otherwise tearDown closes the db mid-read. The other tests await an
+    // updateFromTenant, which already drains it; this one has nothing to await.
+    await container.read(entitlementProvider.notifier).refresh();
     expect(container.read(entitlementProvider).level, EntitlementLevel.active);
   });
 }

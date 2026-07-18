@@ -292,7 +292,15 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
   Future<List<dynamic>> _readOutbox() async {
     final raw = await _db.kvGet(_K.outbox);
     if (raw == null || raw.isEmpty) return [];
-    return jsonDecode(raw) as List<dynamic>;
+    try {
+      return jsonDecode(raw) as List<dynamic>;
+    } catch (_) {
+      // A corrupt blob is unparseable and would otherwise throw during
+      // _restore() at startup — before any guard — and wedge the pending count.
+      // Nothing can be recovered from malformed JSON, so start clean rather than
+      // crash the till, exactly as the pending-deliveries store does.
+      return [];
+    }
   }
 
   Future<void> _writeOutbox(List<dynamic> orders) async {

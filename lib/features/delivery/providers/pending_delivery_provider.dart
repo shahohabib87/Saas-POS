@@ -6,9 +6,10 @@ import 'package:easycasher/core/database/database_provider.dart';
 import 'package:easycasher/features/delivery/models/pending_delivery.dart';
 
 /// Orders that are out with a driver and not yet paid. Kept in the KV store
-/// (not a new table) on purpose — the schema's onUpgrade is destructive, so
-/// riding in the existing settings store avoids a risky migration while still
-/// surviving a restart, exactly like the cloud outbox does.
+/// (not a new table) on purpose — it rides in the existing settings store and
+/// survives a restart with no schema change, exactly like the cloud outbox
+/// does. (The migration is additive now, so a table would be safe too; this
+/// just avoided a bump when the store was first added.)
 class PendingDeliveriesNotifier extends StateNotifier<List<PendingDelivery>> {
   final AppDatabase _db;
   static const _key = 'pending_deliveries';

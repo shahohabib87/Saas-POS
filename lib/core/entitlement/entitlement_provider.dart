@@ -59,6 +59,10 @@ class EntitlementNotifier extends StateNotifier<EntitlementState> {
     });
     final device = DateTime.now().toUtc();
     final now = await _guardedNow();
+    // The constructor kicks this off fire-and-forget, so it can still be in
+    // flight if the provider is disposed (e.g. a fast rebuild, or a test that
+    // tears down straight after reading). Setting state after dispose throws.
+    if (!mounted) return;
     state = EntitlementState(
       entitlement: ent,
       now: now,
