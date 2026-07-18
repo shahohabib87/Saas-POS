@@ -784,6 +784,21 @@ class AppDatabase extends _$AppDatabase {
     return rows.isEmpty ? null : rows.first;
   }
 
+  /// Saved customers whose phone begins with [prefix], for type-ahead at the
+  /// till. Needs at least a few digits so the first keystrokes don't return the
+  /// whole book; capped so the suggestion list stays short. The phone column is
+  /// uniquely indexed, so the `prefix%` scan is cheap and works offline.
+  Future<List<CustomerRow>> findCustomersByPhonePrefix(String prefix,
+      {int limit = 6}) async {
+    final cleaned = prefix.trim();
+    if (cleaned.length < 3) return const [];
+    return (select(customers)
+          ..where((t) => t.phone.like('$cleaned%'))
+          ..orderBy([(t) => OrderingTerm.asc(t.phone)])
+          ..limit(limit))
+        .get();
+  }
+
   Future<void> upsertDriver(DriversCompanion row) =>
       into(drivers).insertOnConflictUpdate(row);
 

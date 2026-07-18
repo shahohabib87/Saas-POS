@@ -54,6 +54,31 @@ void main() {
     expect(await db.findCustomerByPhone(''), isNull);
   });
 
+  test('prefix search offers matching saved numbers for type-ahead', () async {
+    await seedCustomer(id: 'c1', phone: '0770 140 0001', name: 'Rawa');
+    await seedCustomer(id: 'c2', phone: '0770 140 9999', name: 'Dara');
+    await seedCustomer(id: 'c3', phone: '0751 222 3333', name: 'Sara');
+
+    final hits = await db.findCustomersByPhonePrefix('0770 14');
+    expect(hits.map((c) => c.phone),
+        ['0770 140 0001', '0770 140 9999']); // ascending, non-matches excluded
+  });
+
+  test('prefix search waits for a few digits before suggesting', () async {
+    await seedCustomer(phone: '0770 140 0001');
+    // One or two digits would return most of the book — not useful yet.
+    expect(await db.findCustomersByPhonePrefix('07'), isEmpty);
+    expect(await db.findCustomersByPhonePrefix(''), isEmpty);
+  });
+
+  test('prefix search caps the suggestion list', () async {
+    for (var i = 0; i < 10; i++) {
+      await seedCustomer(id: 'c$i', phone: '0770 100 000$i');
+    }
+    final hits = await db.findCustomersByPhonePrefix('0770 100', limit: 6);
+    expect(hits.length, 6);
+  });
+
   test('autofill fills name, area, fee and directions from the book', () async {
     await seedCustomer();
     const areas = [DeliveryArea(id: 'a1', name: 'Ankawa', fee: 2000)];

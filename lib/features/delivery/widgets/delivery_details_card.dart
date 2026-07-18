@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easycasher/core/constants/app_colors.dart';
+import 'package:easycasher/core/database/app_database.dart';
+import 'package:easycasher/core/database/database_provider.dart';
 import 'package:easycasher/features/delivery/providers/delivery_provider.dart';
 
 /// Captured at the till when the order is a delivery: who to call, who is
@@ -21,6 +23,7 @@ class _DeliveryDetailsCardState extends ConsumerState<DeliveryDetailsCard> {
   late final TextEditingController _phone;
   late final TextEditingController _name;
   late final TextEditingController _notes;
+  late final FocusNode _phoneFocus;
   bool _expanded = true;
   bool _recognised = false;
 
@@ -31,6 +34,7 @@ class _DeliveryDetailsCardState extends ConsumerState<DeliveryDetailsCard> {
     _phone = TextEditingController(text: d.phone);
     _name = TextEditingController(text: d.customerName);
     _notes = TextEditingController(text: d.notes);
+    _phoneFocus = FocusNode();
   }
 
   @override
@@ -38,6 +42,7 @@ class _DeliveryDetailsCardState extends ConsumerState<DeliveryDetailsCard> {
     _phone.dispose();
     _name.dispose();
     _notes.dispose();
+    _phoneFocus.dispose();
     super.dispose();
   }
 
@@ -60,6 +65,14 @@ class _DeliveryDetailsCardState extends ConsumerState<DeliveryDetailsCard> {
     if (_recognised != (found != null)) {
       setState(() => _recognised = found != null);
     }
+  }
+
+  /// A suggested number was tapped — adopt it and fill the rest of the record,
+  /// exactly as if the cashier had typed the whole number and it matched.
+  void _onCustomerPicked(CustomerRow c) {
+    _phone.text = c.phone;
+    _onPhoneChanged(c.phone);
+    _phoneFocus.unfocus();
   }
 
   @override
@@ -127,15 +140,94 @@ class _DeliveryDetailsCardState extends ConsumerState<DeliveryDetailsCard> {
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
               child: Column(
                 children: [
-                  _Field(
-                    controller: _phone,
-                    hint: 'Phone number *',
-                    keyboardType: TextInputType.phone,
-                    // The phone is how the driver rescues a delivery when the
-                    // address turns out to be wrong, so it is flagged visually
-                    // until filled.
-                    invalid: details.phone.trim().isEmpty,
-                    onChanged: _onPhoneChanged,
+                  // The phone is how the driver rescues a delivery when the
+                  // address turns out to be wrong, so it is flagged visually
+                  // until filled. Typing three or more digits offers matching
+                  // saved numbers from the local book — pick one to fill the
+                  // whole customer without retyping.
+                  RawAutocomplete<CustomerRow>(
+                    textEditingController: _phone,
+                    focusNode: _phoneFocus,
+                    displayStringForOption: (c) => c.phone,
+                    optionsBuilder: (TextEditingValue value) => ref
+                        .read(appDatabaseProvider)
+                        .findCustomersByPhonePrefix(value.text),
+                    onSelected: _onCustomerPicked,
+                    fieldViewBuilder:
+                        (context, controller, focusNode, onFieldSubmitted) {
+                      return _Field(
+                        controller: controller,
+                        focusNode: focusNode,
+                        hint: 'Phone number *',
+                        keyboardType: TextInputType.phone,
+                        invalid: details.phone.trim().isEmpty,
+                        onChanged: _onPhoneChanged,
+                      );
+                    },
+                    optionsViewBuilder: (context, onSelected, options) {
+                      return Align(
+                        alignment: Alignment.topLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Material(
+                            elevation: 4,
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(8),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                  maxHeight: 216, maxWidth: 340),
+                              child: ListView.builder(
+                                padding: EdgeInsets.zero,
+                                shrinkWrap: true,
+                                itemCount: options.length,
+                                itemBuilder: (context, i) {
+                                  final c = options.elementAt(i);
+                                  return InkWell(
+                                    onTap: () => onSelected(c),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 10),
+                                      child: Row(
+                                        children: [
+                                          const Icon(
+                                              Icons.person_outline_rounded,
+                                              size: 15,
+                                              color:
+                                                  AppColors.onSurfaceVariant),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            c.phone,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.onSurface,
+                                            ),
+                                          ),
+                                          if (c.name.isNotEmpty) ...[
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                c.name,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: AppColors.onSurface
+                                                      .withValues(alpha: 0.6),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 8),
                   _Field(
@@ -216,6 +308,7 @@ class _IncompleteChip extends StatelessWidget {
 
 class _Field extends StatelessWidget {
   final TextEditingController controller;
+  final FocusNode? focusNode;
   final String hint;
   final TextInputType? keyboardType;
   final bool invalid;
@@ -225,6 +318,7 @@ class _Field extends StatelessWidget {
     required this.controller,
     required this.hint,
     required this.onChanged,
+    this.focusNode,
     this.keyboardType,
     this.invalid = false,
   });
@@ -242,6 +336,7 @@ class _Field extends StatelessWidget {
 
     return TextField(
       controller: controller,
+      focusNode: focusNode,
       keyboardType: keyboardType,
       onChanged: onChanged,
       style: const TextStyle(fontSize: 13),
