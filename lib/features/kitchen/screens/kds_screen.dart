@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:easycasher/core/sync/cloud_sync.dart';
+import 'package:easycasher/features/auth/models/staff.dart';
 import 'package:easycasher/features/auth/providers/auth_provider.dart';
 import 'package:easycasher/features/kitchen/models/kitchen_order.dart';
+import 'package:easycasher/features/kitchen/providers/kitchen_link_provider.dart';
 import 'package:easycasher/features/kitchen/providers/kitchen_provider.dart';
 import 'package:easycasher/features/kitchen/widgets/kot_card.dart';
 
@@ -11,6 +14,12 @@ class KdsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final orders = ref.watch(kitchenProvider);
+    // Bumps route through the link: applied locally on the till, sent to the
+    // till from a LAN kitchen display.
+    void bump(String id) => ref.read(kitchenLinkProvider.notifier).bump(id);
+    final isKdsDevice =
+        ref.watch(cloudSyncProvider.select((s) => s.deviceMode)) ==
+            DeviceMode.kds;
 
     int byPriority(KitchenOrder a, KitchenOrder b) =>
         a.orderType.priority.compareTo(b.orderType.priority);
@@ -28,6 +37,7 @@ class KdsScreen extends ConsumerWidget {
             inProgress: inProgress.length,
             ready: ready.length,
           ),
+          if (isKdsDevice) const _LinkStatusStrip(),
           Expanded(
             child: orders.isEmpty
                 ? const _EmptyKds()
@@ -39,7 +49,7 @@ class KdsScreen extends ConsumerWidget {
                         count: pending.length,
                         accentColor: const Color(0xFF10B981),
                         orders: pending,
-                        onBump: (id) => ref.read(kitchenProvider.notifier).bump(id),
+                        onBump: bump,
                       ),
                       _ColumnDivider(),
                       _KdsColumn(
@@ -47,7 +57,7 @@ class KdsScreen extends ConsumerWidget {
                         count: inProgress.length,
                         accentColor: const Color(0xFF4529E7),
                         orders: inProgress,
-                        onBump: (id) => ref.read(kitchenProvider.notifier).bump(id),
+                        onBump: bump,
                       ),
                       _ColumnDivider(),
                       _KdsColumn(
@@ -55,7 +65,7 @@ class KdsScreen extends ConsumerWidget {
                         count: ready.length,
                         accentColor: Colors.white54,
                         orders: ready,
-                        onBump: (id) => ref.read(kitchenProvider.notifier).bump(id),
+                        onBump: bump,
                       ),
                     ],
                   ),
@@ -181,6 +191,14 @@ class _KdsHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // A device locked to KDS mode would otherwise be locked forever — only a
+    // manager can flip it back to a full POS from here.
+    final staff = ref.watch(currentStaffProvider);
+    final canExitKdsMode = ref.watch(
+            cloudSyncProvider.select((s) => s.deviceMode)) ==
+            DeviceMode.kds &&
+        (staff?.role == StaffRole.admin || staff?.role == StaffRole.manager);
+
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -209,6 +227,24 @@ class _KdsHeader extends ConsumerWidget {
           const SizedBox(width: 16),
           const _VerticalDivider(),
           const SizedBox(width: 16),
+          if (canExitKdsMode) ...[
+            TextButton.icon(
+              onPressed: () => ref
+                  .read(cloudSyncProvider.notifier)
+                  .setDeviceMode(DeviceMode.full),
+              icon: const Icon(Icons.point_of_sale_rounded, size: 16),
+              label: const Text('Exit KDS mode'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white60,
+                backgroundColor: Colors.white.withValues(alpha: 0.06),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           TextButton.icon(
             onPressed: () => ref.read(authProvider.notifier).logout(),
             icon: const Icon(Icons.logout_rounded, size: 16),
@@ -271,6 +307,54 @@ class _HeaderChip extends StatelessWidget {
             label,
             style: TextStyle(color: color, fontSize: 11),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// On a dedicated kitchen device the board is a mirror of the till — this
+/// strip says whether the mirror is live, so an empty board is never ambiguous
+/// (no orders vs. not connected).
+class _LinkStatusStrip extends ConsumerWidget {
+  const _LinkStatusStrip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final link = ref.watch(kitchenLinkProvider);
+
+    final (color, text) = switch (link.status) {
+      KdsLinkStatus.connected => (
+          const Color(0xFF10B981),
+          'Connected to till (${link.tillAddress})',
+        ),
+      KdsLinkStatus.connecting => (
+          const Color(0xFFF59E0B),
+          'Connecting to till at ${link.tillAddress}… retrying',
+        ),
+      KdsLinkStatus.unconfigured => (
+          const Color(0xFFF59E0B),
+          'No till address set — enter it in Settings → Cloud Sync on this device',
+        ),
+      // A KDS device never reports `serving`; covered for completeness.
+      KdsLinkStatus.serving => (const Color(0xFF10B981), 'Serving'),
+    };
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      color: color.withValues(alpha: 0.12),
+      child: Row(
+        children: [
+          Icon(
+            link.status == KdsLinkStatus.connected
+                ? Icons.wifi_rounded
+                : Icons.wifi_off_rounded,
+            size: 14,
+            color: color,
+          ),
+          const SizedBox(width: 8),
+          Text(text, style: TextStyle(color: color, fontSize: 12)),
         ],
       ),
     );

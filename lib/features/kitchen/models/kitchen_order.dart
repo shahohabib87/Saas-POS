@@ -31,6 +31,20 @@ class KotItem {
   });
 
   double get subtotal => unitPrice * quantity;
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'quantity': quantity,
+        'unitPrice': unitPrice,
+        'modifierSummary': modifierSummary,
+      };
+
+  factory KotItem.fromJson(Map<String, dynamic> j) => KotItem(
+        name: '${j['name'] ?? ''}',
+        quantity: (j['quantity'] as num?)?.toInt() ?? 1,
+        unitPrice: (j['unitPrice'] as num?)?.toDouble() ?? 0,
+        modifierSummary: '${j['modifierSummary'] ?? ''}',
+      );
 }
 
 class KitchenOrder {
@@ -73,4 +87,40 @@ class KitchenOrder {
   Duration get elapsed => DateTime.now().difference(createdAt);
 
   double get total => items.fold(0.0, (s, i) => s + i.subtotal);
+
+  // Tickets travel between the till and LAN kitchen displays as JSON, so a
+  // shape surprise from a mismatched app version must never crash the board —
+  // parse tolerantly and skip what can't be read.
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'kotNumber': kotNumber,
+        'tableId': tableId,
+        'tableLabel': tableLabel,
+        'items': [for (final i in items) i.toJson()],
+        'status': status.name,
+        'orderType': orderType.name,
+        'createdAt': createdAt.toIso8601String(),
+      };
+
+  static KitchenOrder? tryFromJson(dynamic raw) {
+    if (raw is! Map<String, dynamic>) return null;
+    final id = raw['id'];
+    if (id is! String || id.isEmpty) return null;
+    return KitchenOrder(
+      id: id,
+      kotNumber: (raw['kotNumber'] as num?)?.toInt() ?? 1,
+      tableId: '${raw['tableId'] ?? ''}',
+      tableLabel: '${raw['tableLabel'] ?? ''}',
+      items: [
+        for (final e in (raw['items'] as List? ?? const []))
+          if (e is Map<String, dynamic>) KotItem.fromJson(e),
+      ],
+      status: KotStatus.values.asNameMap()[raw['status']] ?? KotStatus.pending,
+      orderType: KotOrderType.values.asNameMap()[raw['orderType']] ??
+          KotOrderType.dineIn,
+      createdAt:
+          DateTime.tryParse('${raw['createdAt']}') ?? DateTime.now(),
+    );
+  }
 }

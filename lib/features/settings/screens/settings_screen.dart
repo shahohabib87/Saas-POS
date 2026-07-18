@@ -7,6 +7,7 @@ import 'package:easycasher/features/auth/providers/auth_provider.dart';
 import 'package:easycasher/features/settings/models/app_settings.dart';
 import 'package:easycasher/features/settings/providers/settings_provider.dart';
 import 'package:easycasher/core/sync/cloud_sync.dart';
+import 'package:easycasher/features/kitchen/providers/kitchen_link_provider.dart';
 
 /// Records are created and edited in the web console, not here — the terminal
 /// only operates on what the cloud sends down. So there is no table CRUD, and
@@ -1568,11 +1569,99 @@ class _CloudSectionState extends ConsumerState<_CloudSection> {
                   style: TextStyle(
                       fontSize: 12, color: AppColors.onSurfaceVariant),
                 ),
+                const SizedBox(height: 12),
+                const _KdsLinkSettings(),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// LAN kitchen link. On a till this shows the address kitchen devices dial;
+/// on a device being set up as a KDS it takes the till's address. Set the
+/// address BEFORE switching the mode — a KDS device boots straight to the
+/// board (a manager can still exit KDS mode from the board's header).
+class _KdsLinkSettings extends ConsumerStatefulWidget {
+  const _KdsLinkSettings();
+
+  @override
+  ConsumerState<_KdsLinkSettings> createState() => _KdsLinkSettingsState();
+}
+
+class _KdsLinkSettingsState extends ConsumerState<_KdsLinkSettings> {
+  final _addr = TextEditingController();
+  bool _seeded = false;
+  bool _saved = false;
+
+  @override
+  void dispose() {
+    _addr.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final link = ref.watch(kitchenLinkProvider);
+
+    // Seed the field once from the stored address (it loads async).
+    if (!_seeded && link.tillAddress.isNotEmpty && _addr.text.isEmpty) {
+      _addr.text = link.tillAddress;
+      _seeded = true;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (link.serverAddress.isNotEmpty) ...[
+          Text(
+            'Kitchen displays on this network connect to:  ${link.serverAddress}'
+            '${link.clients > 0 ? '   ·   ${link.clients} connected' : ''}',
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.onSurface),
+          ),
+          const SizedBox(height: 10),
+        ],
+        const _FieldLabel('TILL ADDRESS (FOR A KITCHEN DISPLAY DEVICE)'),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            SizedBox(
+              width: 260,
+              child: TextField(
+                controller: _addr,
+                decoration: const InputDecoration(
+                  hintText: 'e.g. 192.168.1.10',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+                style: const TextStyle(fontSize: 13),
+                onChanged: (_) => setState(() => _saved = false),
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton(
+              onPressed: () async {
+                await ref
+                    .read(kitchenLinkProvider.notifier)
+                    .setTillAddress(_addr.text);
+                if (mounted) setState(() => _saved = true);
+              },
+              child: Text(_saved ? 'Saved ✓' : 'Save'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'On the kitchen device: enter the till\'s address shown above, save, '
+          'then switch this device to "Kitchen Display only".',
+          style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+        ),
+      ],
     );
   }
 }

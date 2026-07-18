@@ -6,6 +6,7 @@ import 'package:easycasher/features/auth/models/staff.dart';
 import 'package:easycasher/features/auth/providers/auth_provider.dart';
 import 'package:easycasher/features/auth/screens/login_screen.dart';
 import 'package:easycasher/features/cashier/screens/cashier_screen.dart';
+import 'package:easycasher/features/kitchen/providers/kitchen_link_provider.dart';
 import 'package:easycasher/features/kitchen/screens/kds_screen.dart';
 
 class App extends ConsumerWidget {
@@ -16,6 +17,9 @@ class App extends ConsumerWidget {
     final staff = ref.watch(currentStaffProvider);
     final deviceMode =
         ref.watch(cloudSyncProvider.select((s) => s.deviceMode));
+    // Keep the LAN kitchen link alive for the whole app session: the till
+    // serves tickets to kitchen displays; a KDS device mirrors its till.
+    ref.watch(kitchenLinkProvider);
 
     return MaterialApp(
       title: 'EasyCasher',

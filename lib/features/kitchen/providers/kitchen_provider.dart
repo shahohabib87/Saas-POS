@@ -103,6 +103,13 @@ class KitchenNotifier extends StateNotifier<List<KitchenOrder>> {
 
   int kotCountForTable(String tableId) =>
       state.where((o) => o.tableId == tableId).length;
+
+  /// A KDS device mirrors the till: every snapshot that arrives over the LAN
+  /// replaces the whole board. The till itself never calls this — it is the
+  /// authority and mutates through send/bump/void.
+  void replaceAll(List<KitchenOrder> orders) {
+    state = orders;
+  }
 }
 
 final kitchenProvider =
