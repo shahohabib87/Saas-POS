@@ -1,3 +1,6 @@
+# Agent memory notes — contain deployment secrets, must never reach a remote
+.claude/
+
 # Miscellaneous
 *.class
 *.log
