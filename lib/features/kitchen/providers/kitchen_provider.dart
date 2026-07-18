@@ -38,6 +38,24 @@ class KitchenNotifier extends StateNotifier<List<KitchenOrder>> {
   }
 
   void bump(String id) {
+    KitchenOrder? target;
+    for (final o in state) {
+      if (o.id == id) {
+        target = o;
+        break;
+      }
+    }
+    if (target == null) return;
+
+    // A finished takeout/delivery ticket has no open check to settle later, so
+    // bumping it once it's ready clears it off the board (handed to the customer
+    // / out with the driver). A dine-in ticket stays until the table pays.
+    if (target.status == KotStatus.ready &&
+        target.orderType != KotOrderType.dineIn) {
+      state = state.where((o) => o.id != id).toList();
+      return;
+    }
+
     state = [
       for (final o in state)
         if (o.id == id)

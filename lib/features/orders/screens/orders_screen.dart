@@ -199,13 +199,16 @@ class _ActiveOrdersBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final allKots      = ref.watch(kitchenProvider);
+    // Only dine-in tickets belong to a table row; takeout/delivery tickets live
+    // on the KDS (and delivery also appears in the pending list below).
+    final dineInKots   = allKots.where((o) => o.orderType == KotOrderType.dineIn).toList();
     final tables       = ref.watch(tablesProvider);
     final savedOrders  = ref.watch(savedTableOrdersProvider);
     final pending      = ref.watch(pendingDeliveriesProvider);
     final selectedType = ref.watch(_selectedOrderTypeProvider);
 
     final activeTableIds = {
-      ...allKots.map((o) => o.tableId),
+      ...dineInKots.map((o) => o.tableId),
       ...savedOrders.entries.where((e) => e.value.isNotEmpty).map((e) => e.key),
     };
 
@@ -215,7 +218,7 @@ class _ActiveOrdersBody extends ConsumerWidget {
         orElse: () => RestaurantTable(
             id: tableId, number: 0, capacity: 0, status: TableStatus.occupied),
       );
-      final kots      = allKots.where((o) => o.tableId == tableId).toList();
+      final kots      = dineInKots.where((o) => o.tableId == tableId).toList();
       final cartItems = savedOrders[tableId] ?? [];
       final total     = kots.fold(0.0, (s, o) => s + o.total) +
                         cartItems.fold(0.0, (s, i) => s + i.unitPrice * i.quantity);

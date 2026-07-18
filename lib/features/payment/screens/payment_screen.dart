@@ -177,6 +177,18 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     );
 
     ref.read(paymentHistoryProvider.notifier).add(payment);
+    // Takeaway is paid up front but still has to be cooked — fire it to the
+    // kitchen so it shows on the KDS (dine-in already fired via Send to Kitchen;
+    // delivery fires when it goes out). A unique id keeps the table-clear below
+    // from wiping it.
+    if (orderType == OrderType.takeaway) {
+      ref.read(kitchenProvider.notifier).send(
+            tableId: 'to_${payment.id}',
+            tableLabel: orderNumber,
+            cartItems: widget.cartItems,
+            orderType: KotOrderType.takeout,
+          );
+    }
     ref.read(kitchenProvider.notifier).clearTable(widget.table.id);
     ref.read(savedTableOrdersProvider.notifier).update(
       (s) => Map.fromEntries(s.entries.where((e) => e.key != widget.table.id)),

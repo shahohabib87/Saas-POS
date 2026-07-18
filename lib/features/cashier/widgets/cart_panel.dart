@@ -1007,6 +1007,15 @@ class _ActionButtons extends ConsumerWidget {
 
     ref.read(pendingDeliveriesProvider.notifier).add(pending);
 
+    // The kitchen still has to cook a delivery — fire a ticket to the KDS so it
+    // shows there alongside dine-in and takeout. A unique id keeps it separate.
+    ref.read(kitchenProvider.notifier).send(
+          tableId: 'dl_${pending.id}',
+          tableLabel: pending.orderNumber,
+          cartItems: cartItems,
+          orderType: KotOrderType.delivery,
+        );
+
     // Reset the till for the next order and start a fresh order number.
     ref.read(cartProvider.notifier).clear();
     ref.read(orderNoteProvider.notifier).state = '';
