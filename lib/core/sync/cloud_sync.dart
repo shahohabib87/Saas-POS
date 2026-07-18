@@ -342,6 +342,12 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
       'customer_phone': p.customerPhone.isEmpty ? null : p.customerPhone,
       'delivery_notes': p.deliveryNotes.isEmpty ? null : p.deliveryNotes,
       'driver_id': p.driverId,
+      // A sale reaches the cloud only once the cashier has collected the cash at
+      // the till, so an in-house delivery arrives ALREADY reconciled — stamp it
+      // settled so it never shows as "cash owed" on the web. The till is the
+      // single place delivery cash is collected; the owner only watches there.
+      'driver_settled_at':
+          _serverOrderType(p.orderType) == 'delivery' ? placedAt : null,
       // Not an order column — the server reads it to set the customer's area.
       // It is validated as `nullable|uuid`, and a 422 fails the whole batch,
       // so anything that isn't a uuid is sent as null rather than wedging the

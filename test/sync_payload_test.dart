@@ -18,7 +18,8 @@ void main() {
     'subtotal', 'discount_amount', 'tax', 'tip', 'delivery_fee', 'total',
     'method', 'cash_paid', 'card_paid', 'change_amount', 'status', 'note',
     'placed_at', 'customer_name', 'customer_phone', 'delivery_address',
-    'delivery_notes', 'driver_id', 'platform', 'online_status', 'platform_ref',
+    'delivery_notes', 'driver_id', 'driver_settled_at', 'platform',
+    'online_status', 'platform_ref',
   };
 
   /// Keys the endpoint reads but does not persist on the order.
