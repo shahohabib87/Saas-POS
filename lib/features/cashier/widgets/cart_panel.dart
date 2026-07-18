@@ -16,6 +16,7 @@ import 'package:easycasher/features/delivery/providers/delivery_provider.dart';
 import 'package:easycasher/features/delivery/providers/pending_delivery_provider.dart';
 import 'package:easycasher/features/delivery/models/pending_delivery.dart';
 import 'package:easycasher/features/delivery/widgets/delivery_details_card.dart';
+import 'package:easycasher/features/shift/providers/shift_provider.dart';
 import 'package:easycasher/core/entitlement/entitlement.dart';
 import 'package:easycasher/core/entitlement/entitlement_provider.dart';
 
@@ -798,6 +799,9 @@ class _ActionButtons extends ConsumerWidget {
     // Settling a check that's already gone to the kitchen is always allowed —
     // a lapse must never strand a seated table. Only brand-new sales stop.
     final isSettlingOpenCheck = kotTotal > 0;
+    // No open shift means no cash drawer to take money into, so no selling at
+    // all — the cashier must open a shift first. This gates every sell action.
+    final noShift = ref.watch(shiftProvider) == null;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
@@ -809,9 +813,11 @@ class _ActionButtons extends ConsumerWidget {
               width: double.infinity,
               height: 48,
               child: ElevatedButton.icon(
-                onPressed: locked
-                    ? () => _blockedBySubscription(context)
-                    : () => _sendToKitchen(context, ref),
+                onPressed: noShift
+                    ? () => _blockedByNoShift(context)
+                    : locked
+                        ? () => _blockedBySubscription(context)
+                        : () => _sendToKitchen(context, ref),
                 icon: const Icon(Icons.kitchen_rounded, size: 18),
                 label: const Text(
                   'Send to Kitchen',
@@ -871,9 +877,11 @@ class _ActionButtons extends ConsumerWidget {
             height: 48,
             child: isDelivery
                 ? ElevatedButton.icon(
-                    onPressed: locked
-                        ? () => _blockedBySubscription(context)
-                        : () => _sendOutForDelivery(context, ref, total),
+                    onPressed: noShift
+                        ? () => _blockedByNoShift(context)
+                        : locked
+                            ? () => _blockedBySubscription(context)
+                            : () => _sendOutForDelivery(context, ref, total),
                     icon: const Icon(Icons.moped_rounded, size: 18),
                     label: Text(
                       'Out for Delivery  •  IQD ${total.toStringAsFixed(0)}',
@@ -889,9 +897,11 @@ class _ActionButtons extends ConsumerWidget {
                     ),
                   )
                 : ElevatedButton(
-                    onPressed: (locked && !isSettlingOpenCheck)
-                        ? () => _blockedBySubscription(context)
-                        : () => _confirmPay(context, ref),
+                    onPressed: noShift
+                        ? () => _blockedByNoShift(context)
+                        : (locked && !isSettlingOpenCheck)
+                            ? () => _blockedBySubscription(context)
+                            : () => _confirmPay(context, ref),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
@@ -917,6 +927,18 @@ class _ActionButtons extends ConsumerWidget {
         content: Text(
           'Subscription expired — renew to start new orders. '
           'You can still settle open checks and close the shift.',
+        ),
+        backgroundColor: AppColors.danger,
+      ),
+    );
+  }
+
+  void _blockedByNoShift(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Open a shift before selling — cash needs a drawer to go into. '
+          'Tap Shift in the sidebar to start one.',
         ),
         backgroundColor: AppColors.danger,
       ),
