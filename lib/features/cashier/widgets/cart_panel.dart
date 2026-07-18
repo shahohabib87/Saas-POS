@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easycasher/core/constants/app_colors.dart';
 import 'package:easycasher/features/cashier/providers/cashier_provider.dart';
 import 'package:easycasher/features/cashier/widgets/cart_item_tile.dart';
-import 'package:easycasher/core/constants/app_constants.dart';
+import 'package:easycasher/features/settings/providers/settings_provider.dart';
 import 'package:easycasher/features/kitchen/models/kitchen_order.dart';
 import 'package:easycasher/features/kitchen/providers/kitchen_provider.dart';
 import 'package:easycasher/features/tables/models/restaurant_table.dart';
@@ -50,7 +50,7 @@ class CartPanel extends ConsumerWidget {
         ? billSubtotal * (discountValue / 100)
         : discountValue.clamp(0.0, billSubtotal);
     final discountedSubtotal = billSubtotal - discountAmount;
-    final billTax = discountedSubtotal * AppConstants.taxRate;
+    final billTax = discountedSubtotal * ref.watch(taxMultiplierProvider);
     // Delivery is charged on top of tax: it is a service, not part of the food.
     final billTotal = discountedSubtotal + billTax + deliveryFee;
 
@@ -946,7 +946,7 @@ class _ActionButtons extends ConsumerWidget {
     final discountAmount = discountType == DiscountType.percent
         ? subtotal * (discountValue / 100)
         : discountValue.clamp(0.0, subtotal);
-    final tax = (subtotal - discountAmount) * AppConstants.taxRate;
+    final tax = (subtotal - discountAmount) * ref.read(taxMultiplierProvider);
 
     final driverName = (ref.read(driversProvider).valueOrNull ?? [])
             .where((d) => d.id == delivery.driverId)

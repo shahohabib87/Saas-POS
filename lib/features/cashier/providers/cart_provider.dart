@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:easycasher/core/constants/app_constants.dart';
+import 'package:easycasher/features/settings/providers/settings_provider.dart';
 import 'package:easycasher/features/cashier/models/cart_item.dart';
 import 'package:easycasher/features/cashier/models/modifier.dart';
 
@@ -67,7 +67,7 @@ final subtotalProvider = Provider<double>(
     (ref) => ref.watch(cartProvider).fold(0.0, (s, ci) => s + ci.subtotal));
 
 final taxProvider = Provider<double>(
-    (ref) => ref.watch(subtotalProvider) * AppConstants.taxRate);
+    (ref) => ref.watch(subtotalProvider) * ref.watch(taxMultiplierProvider));
 
 final totalProvider = Provider<double>(
     (ref) => ref.watch(subtotalProvider) + ref.watch(taxProvider));

@@ -26,6 +26,16 @@ final settingsProvider =
   return SettingsNotifier(ref.watch(appDatabaseProvider));
 });
 
+/// The tax multiplier to apply to a bill: the configured rate as a fraction
+/// (the setting stores a percentage, e.g. 15 for 15%), or zero when tax is
+/// switched off. One source of truth so the cart, the payment screen and the
+/// receipt always agree — the old hardcoded `AppConstants.taxRate = 0` meant
+/// enabling tax in Settings had no effect anywhere.
+final taxMultiplierProvider = Provider<double>((ref) {
+  final s = ref.watch(settingsProvider);
+  return s.taxEnabled ? (s.taxRate / 100.0) : 0.0;
+});
+
 class StaffListNotifier extends StateNotifier<List<Staff>> {
   final AppDatabase _db;
 

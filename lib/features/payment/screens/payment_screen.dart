@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:easycasher/core/constants/app_colors.dart';
-import 'package:easycasher/core/constants/app_constants.dart';
 import 'package:easycasher/features/cashier/models/cart_item.dart';
 import 'package:easycasher/features/auth/providers/auth_provider.dart';
 import 'package:easycasher/features/cashier/providers/cashier_provider.dart';
@@ -12,6 +11,7 @@ import 'package:easycasher/features/kitchen/models/kitchen_order.dart';
 import 'package:easycasher/features/kitchen/providers/kitchen_provider.dart';
 import 'package:easycasher/features/payment/models/payment.dart';
 import 'package:easycasher/features/payment/providers/payment_provider.dart';
+import 'package:easycasher/features/payment/services/receipt_pdf.dart';
 import 'package:easycasher/features/settings/providers/settings_provider.dart';
 import 'package:easycasher/features/tables/models/restaurant_table.dart';
 import 'package:easycasher/features/tables/providers/tables_provider.dart';
@@ -56,7 +56,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   double get _discountedSubtotal => _subtotal - _discountAmount;
-  double get _tax => _discountedSubtotal * AppConstants.taxRate;
+  double get _tax => _discountedSubtotal * ref.read(taxMultiplierProvider);
   double get _totalBeforeTip => _discountedSubtotal + _tax;
   double get _total => _totalBeforeTip + _tip;
 
@@ -127,9 +127,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         ),
     ];
 
+    final orderType   = ref.read(orderTypeProvider);
+    // A takeout never "opened a table" to reserve its number, so it claims the
+    // next one here at payment. Without this, consecutive takeouts all reuse the
+    // same Order #. Dine-in (on table open) and delivery (on send-out) already
+    // bumped the counter when they started.
+    if (orderType == OrderType.takeaway) {
+      ref.read(orderCounterProvider.notifier).bump();
+    }
     final staff       = ref.read(currentStaffProvider);
     final orderNumber = ref.read(orderNumberProvider);
-    final orderType   = ref.read(orderTypeProvider);
     final orderTypeLabel = switch (orderType) {
       OrderType.dineIn      => 'Dine-In',
       OrderType.takeaway    => 'Takeout',
@@ -338,9 +345,16 @@ class _ReceiptView extends ConsumerWidget {
             child: Row(
               children: [
                 OutlinedButton.icon(
-                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Printing receipt...')),
-                  ),
+                  onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    try {
+                      await printReceipt(payment, settings);
+                    } catch (e) {
+                      messenger.showSnackBar(
+                        SnackBar(content: Text('Could not print: $e')),
+                      );
+                    }
+                  },
                   icon: const Icon(Icons.print_outlined, size: 16),
                   label: const Text('Print'),
                   style: OutlinedButton.styleFrom(
