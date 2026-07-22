@@ -62,6 +62,11 @@ class _OrderEntry {
 
 final _selectedOrderTypeProvider = StateProvider<_OrderType>((_) => _OrderType.all);
 
+// Completed-tab filters: order type (null = all) and an inclusive date range.
+final _completedTypeProvider = StateProvider<String?>((_) => null);
+final _completedFromProvider = StateProvider<DateTime?>((_) => null);
+final _completedToProvider = StateProvider<DateTime?>((_) => null);
+
 // ── Root screen ───────────────────────────────────────────────────────────────
 
 class OrdersScreen extends ConsumerWidget {
@@ -439,10 +444,23 @@ class _CompletedOrdersBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Newest first
-    final history = ref.watch(paymentHistoryProvider).reversed.toList();
+    final all = ref.watch(paymentHistoryProvider).reversed.toList(); // newest first
+    final typeFilter = ref.watch(_completedTypeProvider);
+    final from = ref.watch(_completedFromProvider);
+    final to = ref.watch(_completedToProvider);
 
-    // Totals for header
+    // The order types actually present, so the filter only offers real options.
+    final types = <String>{for (final p in all) p.orderType}.toList()..sort();
+
+    final history = all.where((p) {
+      if (typeFilter != null && p.orderType != typeFilter) return false;
+      if (from != null && p.timestamp.isBefore(from)) return false;
+      if (to != null && p.timestamp.isAfter(to)) return false;
+      return true;
+    }).toList();
+
+    final filtersActive = typeFilter != null || from != null || to != null;
+
     final totalRevenue = history.fold(0.0, (s, p) => s + p.total);
     final cashCount    = history.where((p) => p.method == PaymentMethod.cash).length;
     final cardCount    = history.where((p) => p.method == PaymentMethod.card).length;
@@ -451,14 +469,20 @@ class _CompletedOrdersBody extends ConsumerWidget {
       color: AppColors.background,
       child: Column(
         children: [
-          // Summary bar
+          _CompletedFilterBar(
+            types: types,
+            typeFilter: typeFilter,
+            from: from,
+            to: to,
+          ),
+          // Summary bar (reflects the current filters)
           Container(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
             color: AppColors.surface,
             child: Row(
               children: [
                 _SummaryChip(
-                  label: '${history.length} orders',
+                  label: '${history.length} order${history.length == 1 ? '' : 's'}',
                   icon: Icons.receipt_long_rounded,
                   color: AppColors.primary,
                 ),
@@ -488,15 +512,28 @@ class _CompletedOrdersBody extends ConsumerWidget {
           Container(height: 1, color: AppColors.outlineVariant),
           Expanded(
             child: history.isEmpty
-                ? const _EmptyState(
-                    icon: Icons.check_circle_outline_rounded,
-                    message: 'No completed orders yet',
-                    sub: 'Paid orders will appear here',
+                ? _EmptyState(
+                    icon: filtersActive
+                        ? Icons.filter_alt_off_rounded
+                        : Icons.check_circle_outline_rounded,
+                    message: filtersActive
+                        ? 'No orders match these filters'
+                        : 'No completed orders yet',
+                    sub: filtersActive
+                        ? 'Try a different type or date range'
+                        : 'Paid orders will appear here',
                   )
-                : ListView.separated(
+                : GridView.builder(
                     padding: const EdgeInsets.all(16),
+                    // Responsive: as many ~480px columns as fit, uniform height.
+                    gridDelegate:
+                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 480,
+                      mainAxisExtent: 88,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                    ),
                     itemCount: history.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
                     itemBuilder: (_, i) => _CompletedCard(
                       payment: history[i],
                       onTap: () => _showDetail(context, history[i]),
@@ -512,6 +549,190 @@ class _CompletedOrdersBody extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (_) => _CompletedDetailDialog(payment: payment),
+    );
+  }
+}
+
+// ── Completed filters: order type + from/to date range ────────────────────────
+
+class _CompletedFilterBar extends ConsumerWidget {
+  final List<String> types;
+  final String? typeFilter;
+  final DateTime? from;
+  final DateTime? to;
+  const _CompletedFilterBar({
+    required this.types,
+    required this.typeFilter,
+    required this.from,
+    required this.to,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final active = typeFilter != null || from != null || to != null;
+
+    return Container(
+      color: AppColors.surface,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _FilterChip(
+                    label: 'All types',
+                    icon: Icons.list_alt_rounded,
+                    selected: typeFilter == null,
+                    onTap: () =>
+                        ref.read(_completedTypeProvider.notifier).state = null,
+                  ),
+                  for (final t in types) ...[
+                    const SizedBox(width: 8),
+                    _FilterChip(
+                      label: t,
+                      icon: Icons.local_offer_outlined,
+                      selected: typeFilter == t,
+                      onTap: () =>
+                          ref.read(_completedTypeProvider.notifier).state = t,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          _DateButton(
+            hint: 'From',
+            value: from,
+            onPick: (d) => ref.read(_completedFromProvider.notifier).state =
+                d == null ? null : DateTime(d.year, d.month, d.day),
+          ),
+          const SizedBox(width: 8),
+          _DateButton(
+            hint: 'To',
+            value: to,
+            // Inclusive: end of the chosen day.
+            onPick: (d) => ref.read(_completedToProvider.notifier).state =
+                d == null ? null : DateTime(d.year, d.month, d.day, 23, 59, 59),
+          ),
+          if (active) ...[
+            const SizedBox(width: 4),
+            IconButton(
+              tooltip: 'Clear filters',
+              icon: const Icon(Icons.clear_rounded, size: 18),
+              color: AppColors.onSurfaceVariant,
+              onPressed: () {
+                ref.read(_completedTypeProvider.notifier).state = null;
+                ref.read(_completedFromProvider.notifier).state = null;
+                ref.read(_completedToProvider.notifier).state = null;
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+  const _FilterChip({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : AppColors.surfaceLow,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.outlineVariant,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon,
+                size: 14,
+                color: selected ? Colors.white : AppColors.onSurfaceVariant),
+            const SizedBox(width: 6),
+            Text(label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: selected ? Colors.white : AppColors.onSurfaceVariant,
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DateButton extends StatelessWidget {
+  final String hint;
+  final DateTime? value;
+  final void Function(DateTime?) onPick;
+  const _DateButton({required this.hint, required this.value, required this.onPick});
+
+  @override
+  Widget build(BuildContext context) {
+    final set = value != null;
+    final text = set
+        ? '$hint: ${value!.day.toString().padLeft(2, '0')}/${value!.month.toString().padLeft(2, '0')}/${value!.year}'
+        : hint;
+
+    return GestureDetector(
+      onTap: () async {
+        final now = DateTime.now();
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: value ?? now,
+          firstDate: DateTime(2020),
+          lastDate: DateTime(now.year + 1, 12, 31),
+        );
+        if (picked != null) onPick(picked);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: set
+              ? AppColors.primary.withValues(alpha: 0.10)
+              : AppColors.surfaceLow,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: set ? AppColors.primary : AppColors.outlineVariant,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.calendar_today_rounded,
+                size: 13,
+                color: set ? AppColors.primary : AppColors.onSurfaceVariant),
+            const SizedBox(width: 6),
+            Text(text,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: set ? AppColors.primary : AppColors.onSurfaceVariant,
+                )),
+          ],
+        ),
+      ),
     );
   }
 }
