@@ -33,6 +33,13 @@ class CloudState {
   final bool busy;
   final String? error;
 
+  // Multi-branch (Phase 3): which branch this terminal operates, plus the
+  // brand's branches to pick from. branchId null = single-branch brand or not
+  // yet chosen; the sync then behaves brand-wide (backward compatible).
+  final String? branchId;
+  final String? branchName;
+  final List<Map<String, dynamic>> branches;
+
   const CloudState({
     this.connected = false,
     this.baseUrl = 'https://app.easycasherorder.online',
@@ -42,7 +49,15 @@ class CloudState {
     this.deviceMode = DeviceMode.full,
     this.busy = false,
     this.error,
+    this.branchId,
+    this.branchName,
+    this.branches = const [],
   });
+
+  /// A multi-branch brand where this terminal hasn't been assigned yet — the
+  /// Settings screen prompts for a choice.
+  bool get needsBranchChoice =>
+      connected && branches.length > 1 && branchId == null;
 
   CloudState copyWith({
     bool? connected,
@@ -54,6 +69,10 @@ class CloudState {
     bool? busy,
     String? error,
     bool clearError = false,
+    String? branchId,
+    String? branchName,
+    List<Map<String, dynamic>>? branches,
+    bool clearBranch = false,
   }) =>
       CloudState(
         connected: connected ?? this.connected,
@@ -64,6 +83,9 @@ class CloudState {
         deviceMode: deviceMode ?? this.deviceMode,
         busy: busy ?? this.busy,
         error: clearError ? null : (error ?? this.error),
+        branchId: clearBranch ? null : (branchId ?? this.branchId),
+        branchName: clearBranch ? null : (branchName ?? this.branchName),
+        branches: branches ?? this.branches,
       );
 }
 
@@ -79,6 +101,11 @@ class _K {
   // Drivers and areas used to be cached here as raw JSON; they have real
   // tables now, alongside the customer book.
   static const deviceMode = 'cloud_device_mode';
+  // Multi-branch: the branch this terminal operates + the brand's branch list
+  // (JSON) so the picker survives a restart offline.
+  static const branchId = 'cloud_branch_id';
+  static const branchName = 'cloud_branch_name';
+  static const branchesJson = 'cloud_branches_json';
   // Highest server time this device has ever seen. The clock-tamper guard: the
   // effective "now" is never allowed to fall behind it, so winding the system
   // clock back cannot buy subscription time.
@@ -142,6 +169,9 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
       baseUrl: await _db.kvGet(_K.baseUrl) ?? state.baseUrl,
       tenantName: await _db.kvGet(_K.tenantName) ?? '',
       lastPullAt: await _db.kvGet(_K.lastPullAt),
+      branchId: await _db.kvGet(_K.branchId),
+      branchName: await _db.kvGet(_K.branchName),
+      branches: await _readBranches(),
     );
     _startHeartbeat();
     _refreshEntitlement(token); // pick up a renewal made while the app was closed
@@ -180,10 +210,23 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
           .read(entitlementProvider.notifier)
           .updateFromTenant(session.tenantJson);
 
+      // Multi-branch: remember the brand's branches and settle which one this
+      // terminal operates. A single-branch brand auto-selects its only branch;
+      // a multi-branch brand keeps a previously-chosen branch if it still
+      // exists, else leaves it unset for the Settings screen to prompt.
+      await _persistBranches(session.branches);
+      final chosen =
+          _resolveBranch(session.branches, await _db.kvGet(_K.branchId));
+      await _writeBranchSelection(chosen);
+
       state = state.copyWith(
         connected: true,
         baseUrl: baseUrl,
         tenantName: session.tenantName,
+        branches: session.branches,
+        branchId: chosen?['id'] as String?,
+        branchName: chosen?['name'] as String?,
+        clearBranch: chosen == null,
       );
 
       await _initialPull(api);
@@ -207,6 +250,9 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
       _K.tenantSlug,
       _K.lastPullAt,
       _K.lastSyncedAt,
+      _K.branchId,
+      _K.branchName,
+      _K.branchesJson,
     ]) {
       await _db.kvDelete(k);
     }
@@ -215,6 +261,68 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
       pendingSales: state.pendingSales,
       deviceMode: state.deviceMode,
     );
+  }
+
+  // ── Multi-branch: which branch this terminal operates ─────────────────────
+
+  /// Assign this terminal to a branch (from the Settings picker). Persists the
+  /// choice, then does a fresh full pull so the local tables/drivers/areas are
+  /// replaced with just this branch's — the checkpoint reset forces it.
+  Future<void> selectBranch(String id, String name) async {
+    await _writeBranchSelection({'id': id, 'name': name});
+    state = state.copyWith(branchId: id, branchName: name);
+
+    final token = await _db.kvGet(_K.token);
+    if (token == null || token.isEmpty) return;
+    state = state.copyWith(busy: true, clearError: true);
+    try {
+      // Drop the delta checkpoint so the next pull is a full, branch-scoped
+      // replace (otherwise the other branch's rows would linger locally).
+      await _db.kvDelete(_K.lastSyncedAt);
+      await _initialPull(CloudApi(baseUrl: state.baseUrl, token: token));
+    } catch (e) {
+      state = state.copyWith(error: CloudApi.errorMessage(e));
+    } finally {
+      state = state.copyWith(busy: false);
+    }
+  }
+
+  /// Pick the branch to operate: a previously-stored one if it still exists,
+  /// else the only branch when there's exactly one, else none (prompt later).
+  Map<String, dynamic>? _resolveBranch(
+      List<Map<String, dynamic>> branches, String? storedId) {
+    if (branches.isEmpty) return null;
+    if (storedId != null) {
+      for (final b in branches) {
+        if (b['id'] == storedId) return b;
+      }
+    }
+    return branches.length == 1 ? branches.first : null;
+  }
+
+  Future<void> _persistBranches(List<Map<String, dynamic>> branches) =>
+      _db.kvSet(_K.branchesJson, jsonEncode(branches));
+
+  Future<List<Map<String, dynamic>>> _readBranches() async {
+    final raw = await _db.kvGet(_K.branchesJson);
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      return (jsonDecode(raw) as List<dynamic>)
+          .whereType<Map<String, dynamic>>()
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> _writeBranchSelection(Map<String, dynamic>? branch) async {
+    if (branch == null) {
+      await _db.kvDelete(_K.branchId);
+      await _db.kvDelete(_K.branchName);
+    } else {
+      await _db.kvSet(_K.branchId, branch['id'] as String);
+      await _db.kvSet(_K.branchName, (branch['name'] ?? '') as String);
+    }
   }
 
   // ── Phase 2: full pull ────────────────────────────────────────────────────
@@ -238,13 +346,16 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
   }
 
   Future<void> _initialPull(CloudApi api) async {
+    // Per-branch reference data is scoped to this terminal's branch; brand-wide
+    // data (categories/menu/staff) isn't. A branch-less till pulls everything.
+    final branch = state.branchId;
     final results = await Future.wait([
       api.fetchCategories(),
       api.fetchMenuItems(),
-      api.fetchTables(),
+      api.fetchTables(branchId: branch),
       api.fetchStaff(),
-      api.fetchDrivers(),
-      api.fetchDeliveryAreas(),
+      api.fetchDrivers(branchId: branch),
+      api.fetchDeliveryAreas(branchId: branch),
     ]);
 
     final cats = results[0].map(_categoryFromJson).toList();
@@ -490,7 +601,7 @@ class CloudSyncNotifier extends StateNotifier<CloudState> {
       final since = await _db.kvGet(_K.lastSyncedAt);
 
       final res = await CloudApi(baseUrl: state.baseUrl, token: token)
-          .sync(orders: outbox, lastSyncedAt: since);
+          .sync(orders: outbox, lastSyncedAt: since, branchId: state.branchId);
 
       // Remove only what the server confirmed.
       final applied = ((res['applied'] as List?) ?? const [])

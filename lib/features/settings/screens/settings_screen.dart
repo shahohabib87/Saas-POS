@@ -1450,6 +1450,48 @@ class _CloudSectionState extends ConsumerState<_CloudSection> {
                               : AppColors.success),
                     ),
                   ),
+                  if (cloud.branches.length > 1) ...[
+                    const SizedBox(height: 16),
+                    const _FieldLabel('BRANCH (THIS TERMINAL)'),
+                    const SizedBox(height: 4),
+                    DropdownButtonFormField<String>(
+                      // Keyed by the selection so a re-pull's state change
+                      // rebuilds the field with the new value.
+                      key: ValueKey('branch-${cloud.branchId}'),
+                      initialValue: cloud.branchId,
+                      isExpanded: true,
+                      decoration: _inputDec('Select this terminal’s branch'),
+                      style: const TextStyle(
+                          fontSize: 13, color: AppColors.onSurface),
+                      items: [
+                        for (final b in cloud.branches)
+                          DropdownMenuItem(
+                            value: b['id'] as String,
+                            child: Text((b['name'] ?? '') as String),
+                          ),
+                      ],
+                      onChanged: cloud.busy
+                          ? null
+                          : (id) {
+                              if (id == null) return;
+                              final b = cloud.branches
+                                  .firstWhere((x) => x['id'] == id);
+                              ref.read(cloudSyncProvider.notifier).selectBranch(
+                                  id, (b['name'] ?? '') as String);
+                            },
+                    ),
+                    if (cloud.needsBranchChoice)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 6),
+                        child: Text(
+                          'Pick which branch this till operates — its tables, '
+                          'drivers and delivery areas load for that branch, and '
+                          'its sales are recorded against it.',
+                          style: TextStyle(
+                              fontSize: 12, color: AppColors.warning),
+                        ),
+                      ),
+                  ],
                   const SizedBox(height: 16),
                   Row(children: [
                     FilledButton.icon(
