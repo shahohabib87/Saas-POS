@@ -4,7 +4,7 @@
 > to understand this system, its decisions, and its open work. Secrets are
 > deliberately absent — credentials live nowhere in this repo.
 >
-> Last updated: 2026-07-19.
+> Last updated: 2026-07-22.
 
 ## 1. What this is
 
@@ -83,7 +83,8 @@ Recently completed, all pushed:
 
 ## 6. Open work (priority order)
 
-1. **Multi-branch** (designed 2026-07-19, NOT built). One tenant = brand; new `branches` table; per-branch: orders/tables/drivers/areas/shifts/stock; shared: menu/staff/customers/settings/subscription. Till picks its branch once in Device Settings; web gets a branch picker + "All branches" consolidated dashboard; plans gain `max_branches` (the per-location upsell). Migration auto-creates a "Main" branch and old tills keep working. Phases: backend foundation → web → till → plan enforcement (~1.5–2 weeks).
+1. **Multi-branch** — ✅ **SHIPPED 2026-07-22 (Phases 1–4), all deployed.** One tenant = brand; `branches` table; per-branch `branch_id` on orders/tables/drivers/areas/expenses/inventory/purchases; shared menu/staff/customers/settings/subscription. What's live: backend foundation + Main backfill + sync stamping (P1); web branch picker (sidebar, shown when >1 branch), per-branch operational views, `Branches` CRUD screen, `X-Branch-Id` filter (P2); till Device-Settings branch picker + branch-scoped `/sync` pull + order stamping (P3); `plans.features.max_branches` cap enforced in `BranchController::store`, seeded Basic 1 / Pro 3, web gates the Add button (P4). Old tills without a branch still work (fall back to Main / pull everything).
+   **Remaining (v2, not built):** per-branch **menu price/availability overrides** and per-branch **stock** (inventory/purchases are still brand-wide — ingredients are `unique(tenant_id,name)`), stock transfers between branches, and a consolidated "All branches" comparison dashboard (today "All" just aggregates). **Ops:** live plans need `max_branches` set (via super-admin plan editor) for caps to bite — until then null = unlimited.
 2. **PIN hashing** (deferred deliberately): PINs are plaintext in the DB and compared with `where('pin', ...)` in three places; hashing needs a candidate-fetch + `Hash::check`, a migration for existing PINs, AND a matching change for the till's offline PIN login. Do only with the ability to run both test suites — an auth bug locks out live tills.
 3. **Payment provider**: `/subscribe` simulates payment (subscriptions are effectively free); no card processing anywhere. Product decision needed (Stripe etc.).
 4. **Online Orders**: UI exists on both ends but there is no real aggregator integration; the web "simulate" tool fabricates orders (manager-gated).
