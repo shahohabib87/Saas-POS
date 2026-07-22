@@ -11,12 +11,21 @@ class CloudSession {
   /// and expiry dates the terminal needs to enforce entitlement offline.
   final Map<String, dynamic> tenantJson;
 
+  /// The brand's branches (multi-branch). Each is {id, name, ...}. The terminal
+  /// picks which one it operates; single-branch brands auto-select the only one.
+  final List<Map<String, dynamic>> branches;
+
+  /// The plan's branch cap (null = unset/unlimited).
+  final int? maxBranches;
+
   const CloudSession({
     required this.token,
     required this.userName,
     required this.tenantName,
     required this.tenantSlug,
     this.tenantJson = const {},
+    this.branches = const [],
+    this.maxBranches,
   });
 }
 
@@ -56,12 +65,17 @@ class CloudApi {
     final data = res.data!;
     final user = data['user'] as Map<String, dynamic>? ?? {};
     final tenant = data['tenant'] as Map<String, dynamic>? ?? {};
+    final branches = ((data['branches'] as List<dynamic>?) ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
     final session = CloudSession(
       token: data['token'] as String,
       userName: (user['name'] ?? '') as String,
       tenantName: (tenant['name'] ?? '') as String,
       tenantSlug: (tenant['slug'] ?? '') as String,
       tenantJson: tenant,
+      branches: branches,
+      maxBranches: (data['max_branches'] as num?)?.toInt(),
     );
     _dio.options.headers['Authorization'] = 'Bearer ${session.token}';
     return session;
@@ -82,19 +96,33 @@ class CloudApi {
 
   Future<List<dynamic>> fetchCategories() => _list('/categories');
   Future<List<dynamic>> fetchMenuItems() => _list('/menu-items');
-  Future<List<dynamic>> fetchTables() => _list('/tables');
   Future<List<dynamic>> fetchStaff() => _list('/staff?with_pins=1');
-  Future<List<dynamic>> fetchDrivers() => _list('/drivers');
-  Future<List<dynamic>> fetchDeliveryAreas() => _list('/delivery-areas');
+  Future<List<dynamic>> fetchBranches() => _list('/branches');
+
+  // Per-branch reference data — scoped to the terminal's branch when it has one
+  // (the server filters by the X-Branch-Id header / ?branch_id; null = all).
+  Future<List<dynamic>> fetchTables({String? branchId}) =>
+      _list(_withBranch('/tables', branchId));
+  Future<List<dynamic>> fetchDrivers({String? branchId}) =>
+      _list(_withBranch('/drivers', branchId));
+  Future<List<dynamic>> fetchDeliveryAreas({String? branchId}) =>
+      _list(_withBranch('/delivery-areas', branchId));
+
+  static String _withBranch(String path, String? branchId) =>
+      branchId == null ? path : '$path?branch_id=$branchId';
 
   /// The offline-first sync endpoint: push queued orders, get the delta back.
+  /// [branchId] declares which branch this terminal operates — it scopes the
+  /// pull and stamps new orders (null for an unassigned / single-branch till).
   Future<Map<String, dynamic>> sync({
     required List<dynamic> orders,
     String? lastSyncedAt,
+    String? branchId,
   }) async {
     final res = await _dio.post<Map<String, dynamic>>('/sync', data: {
       'orders': orders,
       'last_synced_at': ?lastSyncedAt,
+      'branch_id': ?branchId,
     });
     return res.data ?? const {};
   }
